@@ -1,69 +1,86 @@
 import org.bson.Document;
 
 public class GuildSetting {
-    String prefix, countingPrefix;
-    boolean allChannels, autoJoin, trackCounting;
+    String settingsPrefix, countingPrefix;
+    boolean trackCounting;
     long alphabetCount;
     long prevCounterId;
     long channel;
     public GuildSetting() {
-        autoJoin = true;
-        prefix = "!";
+        settingsPrefix = "!";
         countingPrefix = ",";
-        allChannels = true;
         alphabetCount = 0;
         prevCounterId = 0;
         trackCounting = true;
     }
-    public boolean isAllChannels() { return this.allChannels; }
+
     public long getChannel() {
         return this.channel;
     }
-    public boolean isAutoJoin() { return this.autoJoin; }
-
-    public String getPrefix() { return this.prefix; }
+    public String getSettingsPrefix() { return this.settingsPrefix; }
     public String getCountingPrefix() { return this.countingPrefix; }
 
     public long getAlphabetCount() { return this.alphabetCount; }
     public long getPrevCounterId() { return this.prevCounterId; }
     public boolean isTrackCounting() { return this.trackCounting; }
 
-    public void setAllChannels(boolean all) {
-        allChannels = all;
-        if(all) {
-            channel = 0;
-            autoJoin = false;
+    public void setChannel(Long channel) {
+        if(channel == null) {
+            channel = -1L;
         }
-    }
-    public void setChannel(long channel) {
-        allChannels = false;
         this.channel = channel;
     }
-    public void setAutoJoin(boolean auto) {
-        this.autoJoin = auto;
-        if(auto) allChannels = false;
+    public void setTrackCounting(Boolean track) {
+        if(track == null) {
+            track = true;
+        }
+        this.trackCounting = track;
     }
-    public void setTrackCounting(boolean track) { this.trackCounting = track; }
-    public void setPrevCounterId(long userId) { this.prevCounterId = userId; }
-    public void setPrefix(String prefix) { this.prefix = prefix; }
-    public void setCountingPrefix(String prefix) { this.countingPrefix = prefix; }
+    public void setPrevCounterId(Long userId) {
+        if(userId == null) {
+            userId = -1L;
+        }
+        prevCounterId = userId;
+    }
+    public void setSettingsPrefix(String settingsPrefix) {
+        if(settingsPrefix == null) {
+            settingsPrefix = "a!";
+        }
+        this.settingsPrefix = settingsPrefix;
+    }
+    public void setCountingPrefix(String prefix) {
+        if(prefix == null) {
+            prefix = ",";
+        }
+        this.countingPrefix = prefix;
+    }
+    public void setAlphabetCount(Long alphabetCount) {
+        if(alphabetCount == null) {
+            alphabetCount = 0L;
+        }
+        this.alphabetCount = alphabetCount;
+    }
     public void incAlphabetCount() { ++this.alphabetCount; }
     public void resetAlphabetCount() { this.alphabetCount = 0; }
     public Document toDocument(long id) {
         Document document = new Document();
         document.append("_id", id);
-        document.append("allChannels", allChannels);
+        document.append("alphabetCount", alphabetCount);
         document.append("channel", channel);
-        document.append("autoJoin", autoJoin);
-        document.append("prefix", prefix);
+        document.append("countingPrefix", countingPrefix);
+        document.append("prevCounterId", prevCounterId);
+        document.append("settingsPrefix", settingsPrefix);
+        document.append("trackCounting", trackCounting);
         return document;
     }
     public static GuildSetting fromDocument(Document document){
         GuildSetting setting = new GuildSetting();
-        setting.setAllChannels(document.getBoolean("allChannels"));
+        setting.setAlphabetCount(document.getLong("alphabetCount"));
         setting.setChannel(document.getLong("channel"));
-        setting.setAutoJoin(document.getBoolean("autoJoin"));
-        setting.setPrefix(document.getString("prefix"));
+        setting.setCountingPrefix(document.getString("countingPrefix"));
+        setting.setPrevCounterId(document.getLong("prevCounterId"));
+        setting.setSettingsPrefix(document.getString("settingsPefix"));
+        setting.setTrackCounting(document.getBoolean("trackCounting"));
         return setting;
     }
 }
