@@ -2,7 +2,7 @@ import org.bson.Document;
 
 public class GuildSetting {
     String settingsPrefix, countingPrefix;
-    boolean trackCounting;
+    boolean trackCounting, prefixRequired;
     long alphabetCount;
     long prevCounterId;
     long channel;
@@ -12,6 +12,7 @@ public class GuildSetting {
         alphabetCount = 0;
         prevCounterId = 0;
         trackCounting = true;
+        prefixRequired = true;
     }
 
     public long getChannel() {
@@ -19,7 +20,7 @@ public class GuildSetting {
     }
     public String getSettingsPrefix() { return this.settingsPrefix; }
     public String getCountingPrefix() { return this.countingPrefix; }
-
+    public boolean isPrefixRequired() { return this.prefixRequired; }
     public long getAlphabetCount() { return this.alphabetCount; }
     public long getPrevCounterId() { return this.prevCounterId; }
     public boolean isTrackCounting() { return this.trackCounting; }
@@ -35,6 +36,12 @@ public class GuildSetting {
             track = true;
         }
         this.trackCounting = track;
+    }
+    public void setPrefixRequired(Boolean prefixRequired) {
+        if(prefixRequired == null) {
+            prefixRequired = true;
+        }
+        this.prefixRequired = prefixRequired;
     }
     public void setPrevCounterId(Long userId) {
         if(userId == null) {
@@ -68,6 +75,7 @@ public class GuildSetting {
         document.append("alphabetCount", alphabetCount);
         document.append("channel", channel);
         document.append("countingPrefix", countingPrefix);
+        document.append("prefixRequired", prefixRequired);
         document.append("prevCounterId", prevCounterId);
         document.append("settingsPrefix", settingsPrefix);
         document.append("trackCounting", trackCounting);
@@ -78,6 +86,7 @@ public class GuildSetting {
         setting.setAlphabetCount(document.getLong("alphabetCount"));
         setting.setChannel(document.getLong("channel"));
         setting.setCountingPrefix(document.getString("countingPrefix"));
+        setting.setPrefixRequired(document.getBoolean("prefixRequired"));
         setting.setPrevCounterId(document.getLong("prevCounterId"));
         setting.setSettingsPrefix(document.getString("settingsPefix"));
         setting.setTrackCounting(document.getBoolean("trackCounting"));

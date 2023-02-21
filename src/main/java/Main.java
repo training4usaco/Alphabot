@@ -31,6 +31,7 @@ import static com.mongodb.client.model.Filters.eq;
 
 public class Main extends ListenerAdapter {
     public static JDA jda;
+    private static final Long ADMIN = 524989303206707214L;
     public static final String TEXT_CYAN = "\u001B[36m";
     public static final String TEXT_RESET = "\u001B[0m";
     private static MongoCollection<Document> guilds;
@@ -139,25 +140,38 @@ public class Main extends ListenerAdapter {
                 channel.sendMessage("Setting prefix to " + message.substring(10)).queue();
                 currentGuildSetting.setSettingsPrefix(message.substring(10));
             }
+            else if (message.startsWith("setPrefReq ")) {
+                if(message.substring(11).equalsIgnoreCase("on")) {
+                    channel.sendMessage("Counting prefix is now required to count").queue();
+                    currentGuildSetting.setPrefixRequired(true);
+                }
+                else {
+                    channel.sendMessage("Prefix is no longer required to count. **Be careful!**").queue();
+                    currentGuildSetting.setPrefixRequired(false);
+                }
+            }
             else if (message.startsWith("start")) {
                 channel.sendMessage("Counting will now be enabled").queue();
                 currentGuildSetting.setTrackCounting(true);
             }
         }
         else {
-            if(message.startsWith(currentGuildSetting.getCountingPrefix())) {
-                if (channel.getIdLong() == currentGuildSetting.getChannel()) {
+            if (channel.getIdLong() == currentGuildSetting.getChannel()) {
+                if(message.startsWith(currentGuildSetting.getCountingPrefix()) || !guildSettingHashMap.get(guildId).isPrefixRequired()) {
                     if (currentGuildSetting.isTrackCounting()) {
-                        message = message.substring(currentGuildSetting.getCountingPrefix().length()).split(" ", 2)[0];
+                        if (guildSettingHashMap.get(guildId).isPrefixRequired()) {
+                            message = message.substring(currentGuildSetting.getCountingPrefix().length());
+                        }
+                        message = message.split(" ", 2)[0];
 
-                        if (event.getMember().getIdLong() == currentGuildSetting.getPrevCounterId()) {
+                        if (event.getMember().getIdLong() != ADMIN && event.getMember().getIdLong() == currentGuildSetting.getPrevCounterId()) {
                             event.getMessage().addReaction("U+274C").queue();
                             resetCount(channel, currentGuildSetting, event.getMember().getIdLong(), "You can't count twice in a row! Let your friends count too... if you have any.");
                             guilds.replaceOne(eq("_id", event.getGuild().getIdLong()), currentGuildSetting.toDocument(event.getGuild().getIdLong()), options);
                             return;
                         }
 
-                        if (hasNumber(message)) {
+                        if (event.getMember().getIdLong() != ADMIN && hasNumber(message)) {
                             event.getMessage().addReaction("U+274C").queue();
                             resetCount(channel, currentGuildSetting, event.getMember().getIdLong(), "Incorrect count!");
                             guilds.replaceOne(eq("_id", event.getGuild().getIdLong()), currentGuildSetting.toDocument(event.getGuild().getIdLong()), options);
@@ -166,23 +180,28 @@ public class Main extends ListenerAdapter {
 
                         currentGuildSetting.setPrevCounterId(event.getMember().getIdLong());
 
-                        if (getValueFromString(message) != (currentGuildSetting.getAlphabetCount() + 1L)) {
-                            event.getMessage().addReaction("U+274C").queue();
-                            resetCount(channel, currentGuildSetting, event.getMember().getIdLong(), "Incorrect count!");
-                            guilds.replaceOne(eq("_id", event.getGuild().getIdLong()), currentGuildSetting.toDocument(event.getGuild().getIdLong()), options);
+                        String pattern = "([a-zA-Z])\\1*";
+
+                        if(getStringFromValue(currentGuildSetting.getAlphabetCount()).matches(pattern) && getStringFromValue(currentGuildSetting.getAlphabetCount()).endsWith("z")) {
+//                            System.err.println("incing alphacount");
+                            currentGuildSetting.incAlphabetCount();
+                        }
+
+                        if (!message.equals(getStringFromValue(currentGuildSetting.getAlphabetCount() + 1L))) {
+                            if(event.getMember().getIdLong() != ADMIN) {
+                                event.getMessage().addReaction("U+274C").queue();
+                                resetCount(channel, currentGuildSetting, event.getMember().getIdLong(), "Incorrect count!");
+                                guilds.replaceOne(eq("_id", event.getGuild().getIdLong()), currentGuildSetting.toDocument(event.getGuild().getIdLong()), options);
+                            }
                         }
                         else {
                             event.getMessage().addReaction("U+2705").queue();
                             currentGuildSetting.incAlphabetCount();
                             guilds.replaceOne(eq("_id", event.getGuild().getIdLong()), currentGuildSetting.toDocument(event.getGuild().getIdLong()), options);
                         }
-                    }
-                    else {
+                    } else {
                         channel.sendMessage("Counting is currently disabled").queue();
                     }
-                }
-                else {
-                    channel.sendMessage("Please setup a channel for counting!").queue();
                 }
             }
         }
@@ -212,24 +231,26 @@ public class Main extends ListenerAdapter {
         event.deferReply().queue();
 
         if(event.getName().equals("slashtest")) {
-            String message = event.getOption("print_message").getAsString();
-
-            if(message != null) {
-                event.getHook().sendMessage(message).queue();
-            }
+            Long value = event.getOption("value").getAsLong();
+            event.getHook().sendMessage(getStringFromValue(value)).queue();
         }
         else if(event.getName().equals("abchelp")) {
-            EmbedBuilder eb = new EmbedBuilder().setTitle("ALPHABOT HELP").setDescription("**Use `/abcsettings` to see current Alphabot settings and prefixes**\n\n"
+            EmbedBuilder eb = new EmbedBuilder().setTitle("ALPHABOT HELP").setDescription("**Use `/abcsettings` to see current Alphabot settings and prefixes (note that commands without slash use the prefix)**\n\n"
+                    + "**How to Count**\n"
+                    + "Just your classic abc's...\n"
+                    + "Until you reach z, after which it will reset back to aa which is followed by the normal abc's with an extra a in front.\n"
+                    + "Once you reach az, the a will be incremented so the next number will be ba, and so on.\n"
+                    + "Eventually, once you get to zz it will reset back to aaa just like normal counting.\n\n"
+                    + "**Counting Rules**\n"
+                    + "You can't count twice in a row\n\n"
                     + "**Setup Commands**\n"
-                    + "◈ `getChannel` prints the channel that counting is tracked in\n"
-                    + "◈ `getCountingPrefix` prints the prefix for counting\n"
-                    + "◈ `getPrefix` prints the prefix for bot commands\n"
                     + "◈ `setChannel` sets the channel that counting will be tracked in\n"
                     + "◈ `setCountingPrefix` sets the prefix for counting\n"
                     + "◈ `setPrefix` sets the prefix for bot commands\n\n"
                     + "**Counting Commands**\n"
                     + "◈ `start` - enables counting\n"
-                    + "◈ `end` - disables counting\n");
+                    + "◈ `end` - disables counting\n"
+                    + "◈ `/abcPrefReq on/off` - sets whether or not prefix is required to count\n");
             eb.setFooter("coming to a alphabot near you");
 
             event.getHook().sendMessageEmbeds(eb.build()).queue();;
@@ -239,6 +260,7 @@ public class Main extends ListenerAdapter {
             String currCount = getStringFromValue(guildSettingHashMap.get(event.getGuild().getIdLong()).getAlphabetCount());
             String isTracking = "";
             String prevCounterString = "";
+            String prefReq = "";
 
             if(currCount.equals("")) {
                 currCount = "N/A";
@@ -255,9 +277,17 @@ public class Main extends ListenerAdapter {
             else {
                 prevCounterString = "<@" + guildSettingHashMap.get(event.getGuild().getIdLong()).getPrevCounterId() + ">";
             }
+            if(guildSettingHashMap.get(event.getGuild().getIdLong()).isPrefixRequired()) {
+                prefReq = "On";
+            }
+            else {
+                prefReq = "Off - **Be Careful**";
+            }
 
             eb.setDescription("**Current Count: " + currCount + "**\n\n"
+//                    + "Debug, next val: " + getStringFromValue(guildSettingHashMap.get(event.getGuild().getIdLong()).getAlphabetCount() + 1) + "\n"
                     + "**Guild Settings**\n"
+                    + "◈ Prefix Required: " + prefReq + "\n"
                     + "◈ Tracking counting: " + isTracking + "\n"
                     + "◈ Current counting prefix: `" + guildSettingHashMap.get(event.getGuild().getIdLong()).getCountingPrefix() + "`\n"
                     + "◈ Current setting prefix: `" + guildSettingHashMap.get(event.getGuild().getIdLong()).getSettingsPrefix() + "`\n"
@@ -265,6 +295,20 @@ public class Main extends ListenerAdapter {
                     + "◈ Previous Counter: " + prevCounterString + "\n");
 
             event.getHook().sendMessageEmbeds(eb.build()).queue();
+        }
+        else if(event.getName().equals("abcprefreq")) {
+            String setting = event.getOption("setting").getAsString();
+            if(setting.equals("on")) {
+                guildSettingHashMap.get(event.getGuild().getIdLong()).setPrefixRequired(true);
+                event.getHook().sendMessage("Prefix is now required!").queue();
+            }
+            else {
+                guildSettingHashMap.get(event.getGuild().getIdLong()).setPrefixRequired(false);
+                event.getHook().sendMessage("Prefix is no longer required. **Be Careful!**").queue();
+            }
+        }
+        else if(event.getName().equals("abcanagram")) {
+
         }
     }
 
@@ -276,11 +320,16 @@ public class Main extends ListenerAdapter {
 
             jda.getGuildById(doc.getLong("_id")).updateCommands().addCommands(
                     Commands.slash("slashtest", "a test command")
-                            .addOption(OptionType.STRING, "print_message", "prints a given message", true),
+                            .addOption(OptionType.INTEGER, "value", "converts value to string", true),
+
+                    Commands.slash("abcanagram", "Anagram game wip"),
 
                     Commands.slash("abchelp", "Command to help you navigate Alphabot!"),
 
-                    Commands.slash("abcsettings", "Current Alphabot settings")
+                    Commands.slash("abcsettings", "Current Alphabot settings"),
+
+                    Commands.slash("abcprefreq", "Whether or not prefix is required to count")
+                            .addOption(OptionType.STRING, "setting", "Prefix required (on/off)", true)
             ).queue();
         }
         guildList.close();
@@ -312,22 +361,27 @@ public class Main extends ListenerAdapter {
         return ret;
     }
     public static String getStringFromValue(Long val) {
-        System.err.println(val);
-        if(val == 0L) {
-            return "";
+        if(val <= 0L) {
+            return "N/A";
         }
+        System.err.println(val);
+
+        if(val <= 26) {
+            return ALPHABET[(int)(val - 1)];
+        }
+
         Long exp = 0L;
         while(true) {
-            if(val < binPow(26L, exp)) {
+            if(val < binPow(27L, exp)) {
                 break;
             }
             ++exp;
         }
         --exp;
 
-        int idx = (int)(val / binPow(26L, exp)) - 1;
+        int idx = (int)(val / binPow(27L, exp)) - 1;
         String currval = ALPHABET[idx];
-        return (currval) + (getStringFromValue(val % binPow(26L, exp)));
+        return (currval) + (getStringFromValue(val % binPow(27L, exp)));
     }
     public static Long binPow(Long a, Long b) {
         if(b == 0) {
