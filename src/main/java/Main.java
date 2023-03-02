@@ -1,3 +1,6 @@
+import ch.qos.logback.classic.Level;
+import ch.qos.logback.classic.Logger;
+import ch.qos.logback.classic.LoggerContext;
 import com.mongodb.ConnectionString;
 import com.mongodb.client.MongoClient;
 import com.mongodb.client.MongoClients;
@@ -16,8 +19,10 @@ import net.dv8tion.jda.api.hooks.ListenerAdapter;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
+import net.dv8tion.jda.api.interactions.components.ActionRow;
 import net.dv8tion.jda.api.interactions.components.buttons.Button;
 import org.bson.Document;
+import org.slf4j.LoggerFactory;
 
 import java.awt.*;
 import java.io.File;
@@ -38,34 +43,32 @@ public class Main extends ListenerAdapter {
     public static final int SEASONED_SCORE = 5000;
     public static final int ACCOMPLISHED_SCORE = 3000;
     public static final int EXPERIENCED_SCORE = 2000;
-    public static final Double SCORE_A = 71.4286;
-    public static final Double SCORE_B = -234.286;
-    public static final Double SCORE_C = 372.857;
+    public static final double SCORE_A = 71.4286;
+    public static final double SCORE_B = -234.286;
+    public static final double SCORE_C = 372.857;
     public static JDA jda;
-    private static final Long ADMIN = 524989303206707214L;
+    private static final long ADMIN = 524989303206707214L;
     public static final String TEXT_CYAN = "\u001B[36m";
     public static final String TEXT_RESET = "\u001B[0m";
-    public static final Integer GAME_TOTAL_TIME = 60;
-    public static final Integer GAME_LOAD_TIME = 10;
-    public static final Integer GAME_CLOSE_TIME = 5;
-    public static final Integer NUM_LETTERS = 15;
-    public static final Integer NUM_VOWELS = 5;
-    public static final Integer MESSAGE_RESET_LIMIT = 5;
+    public static final int GAME_TOTAL_TIME = 60;
+    public static final int GAME_LOAD_TIME = 10;
+    public static final int GAME_CLOSE_TIME = 5;
+    public static final int NUM_LETTERS = 15;
+    public static final int NUM_VOWELS = 5;
+    public static final int MESSAGE_RESET_LIMIT = 5;
     private static final int VALID = 1;
     private static final int INVALID = -1;
     private static final int USED = 0;
     private static MongoCollection<Document> guilds;
-    private static final Random rand = new Random(System.currentTimeMillis());
-
     private final HashMap<Long, GuildSetting> guildSettingHashMap;
     private final HashMap<String, AnagramSetting> anagramHashMap = new HashMap<>();
     private final HashSet<Long> madeRequestsUsers = new HashSet<>();
     private final HashSet<Long> receivedRequestsUsers = new HashSet<>();
     private static final HashSet<String> Words = new HashSet<>();
     private final ReplaceOptions options = new ReplaceOptions().upsert(true);
-    private static String[] ALPHABET = new String[]{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"};
-    private static String[] VOWELS = new String[]{"a", "a", "e", "e", "i", "i", "o", "o", "u"};
-    private static String[] CONSONANTS = new String[]{"b", "c", "d", "d", "f", "g", "h", "h", "h", "j", "k", "l", "l", "m", "n", "n", "n", "p", "q", "r", "r", "s", "s", "t", "t", "v", "w", "x", "y", "z"};
+    private final static String[] ALPHABET = new String[]{"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"};
+    private final static String[] VOWELS = new String[]{"a", "a", "e", "e", "i", "i", "o", "o", "u"};
+    private final static String[] CONSONANTS = new String[]{"b", "c", "d", "d", "f", "g", "h", "h", "h", "j", "k", "l", "l", "m", "n", "n", "n", "p", "q", "r", "r", "s", "s", "t", "t", "v", "w", "x", "y", "z"};
     public static void main(String[] args) throws IOException {
         Scanner config = new Scanner(new File("Config.txt"));
         try {
@@ -86,6 +89,15 @@ public class Main extends ListenerAdapter {
     }
 
     private Main(ConnectionString string) {
+        LoggerFactory.getLogger("org.mongodb");
+        LoggerContext loggerContext = (LoggerContext) LoggerFactory.getILoggerFactory();
+        for(Logger logger : loggerContext.getLoggerList()) {
+//			System.err.println(logger.getName());
+            if(logger.getName().startsWith("com.mongodb") || logger.getName().startsWith("org.mongodb") || logger.getName().startsWith("net.dv8tion")) {
+                logger.setLevel(Level.WARN);
+            }
+        }
+
         guildSettingHashMap = new HashMap<>();
 
         MongoClient client = MongoClients.create(string);
@@ -105,11 +117,7 @@ public class Main extends ListenerAdapter {
         String message = event.getMessage().getContentRaw();
         GuildSetting currentGuildSetting = guildSettingHashMap.get(guildId);
         MessageChannel channel = event.getChannel();
-        GuildChannel guildChannel = event.getGuildChannel();
 
-        if (message == null) {
-            return;
-        }
         System.err.println(TEXT_CYAN + "Message received: " + message + " in channel " + channel.getName() + " in guild " + event.getGuild().getName() + " from " + event.getMember().getNickname() + TEXT_RESET);
 
         if (currentGuildSetting == null) {
@@ -129,7 +137,7 @@ public class Main extends ListenerAdapter {
                     currAnagramSetting.resetCorrectCounter();
                     return;
                 }
-                if (currAnagramSetting.getMemberId() != event.getAuthor().getIdLong()) {
+                if (currAnagramSetting.getMemberId() != event.getAuthor().getIdLong() && !currAnagramSetting.isParticipant(event.getAuthor().getIdLong())) {
                     event.getThreadChannel().deleteMessageById(thread.getLatestMessageId()).queue();
                     return;
                 }
@@ -170,7 +178,7 @@ public class Main extends ListenerAdapter {
                     return;
                 }
 
-                Integer validity = currAnagramSetting.isValid(message.toLowerCase());
+                int validity = currAnagramSetting.isValid(message.toLowerCase());
                 if(validity == INVALID) {
                     currAnagramSetting.resetCorrectCounter();
                     event.getMessage().addReaction("U+274C").queue();
@@ -180,6 +188,7 @@ public class Main extends ListenerAdapter {
                     currAnagramSetting.updateScore(message.length());
                     currAnagramSetting.updateLongestStreak();
                     currAnagramSetting.setLastMessage(message);
+                    currAnagramSetting.addWord(message, event.getAuthor().getName());
                     int streak = currAnagramSetting.getCorrectCounter();
                     if(streak >= 10) {
                         event.getMessage().addReaction("U+1F4AB").queue();
@@ -294,8 +303,6 @@ public class Main extends ListenerAdapter {
                             guilds.replaceOne(eq("_id", event.getGuild().getIdLong()), currentGuildSetting.toDocument(event.getGuild().getIdLong()), options);
                             return;
                         }
-
-                        String pattern = "([a-zA-Z])\\1*";
 
                         if(getStringFromValue(currentGuildSetting.getAlphabetCount()).endsWith("z")) {
 //                            System.err.println("incing alphacount");
@@ -446,9 +453,9 @@ public class Main extends ListenerAdapter {
         else if(event.getName().equals("abcsettings")) {
             EmbedBuilder eb = new EmbedBuilder().setTitle("ALPHABOT SETTINGS");
             String currCount = getStringFromValue(guildSettingHashMap.get(event.getGuild().getIdLong()).getAlphabetCount());
-            String isTracking = "";
-            String prevCounterString = "";
-            String prefReq = "";
+            String isTracking;
+            String prevCounterString;
+            String prefReq;
 
             if(currCount.equals("")) {
                 currCount = "N/A";
@@ -496,7 +503,6 @@ public class Main extends ListenerAdapter {
             }
         }
         else if(event.getName().equals("abcanagram")) {
-            MessageChannel channel = event.getChannel();
             if(anagramHashMap.containsKey("<@" + event.getMember().getIdLong() + "> anagram")) {
                 event.getHook().sendMessage("You already have a game running currently!").queue();
                 return;
@@ -511,158 +517,32 @@ public class Main extends ListenerAdapter {
             }
 
             if(compOption == null && coopOption == null) {
+                String letters = "";
+                String title = "<@" + event.getMember().getIdLong() + "> anagram; ";
+                for (int i = 0; i < NUM_LETTERS; ++i) {
+                    if (i < NUM_VOWELS) {
+                        letters += VOWELS[(int) (Math.random() * VOWELS.length)];
+                    } else {
+                        letters += CONSONANTS[(int) (Math.random() * CONSONANTS.length)];
+                    }
+                }
 
+                char tempArray[] = letters.toCharArray();
+                Arrays.sort(tempArray);
+                letters = new String(tempArray);
+
+                for (int i = 0; i < NUM_LETTERS; ++i) {
+                    title += (String.valueOf(letters.charAt(i)).toUpperCase() + " ");
+                }
+
+                final String threadTitle = title;
+                final String anagramLetters = letters;
                 event.getHook().sendMessage("Creating a new thread").queue(createThreadMessage -> {
-                    Long threadMessageId = createThreadMessage.getIdLong();
-                    Timer startingTimer = new java.util.Timer();
-
-                    String letters = "";
-                    String title = "<@" + event.getMember().getIdLong() + "> anagram; ";
-                    for (int i = 0; i < NUM_LETTERS; ++i) {
-                        if (i < NUM_VOWELS) {
-                            letters += VOWELS[rand.nextInt(VOWELS.length)];
-                        } else {
-                            letters += CONSONANTS[rand.nextInt(CONSONANTS.length)];
-                        }
-                    }
-
-                    char tempArray[] = letters.toCharArray();
-                    Arrays.sort(tempArray);
-                    letters = new String(tempArray);
-
-                    for (int i = 0; i < NUM_LETTERS; ++i) {
-                        title += (String.valueOf(letters.charAt(i)).toUpperCase() + " ");
-                    }
-
-                    final String anagramLetters = letters;
-
-                    ((TextChannel) event.getChannel()).createThreadChannel(title, threadMessageId).queue(threadChannel -> {
-                        threadChannel.sendMessage("<@" + event.getMember().getIdLong() + "> Your game thread has been created").queue();
-                        anagramHashMap.put("<@" + event.getMember().getIdLong() + "> anagram", new AnagramSetting(GAME_TOTAL_TIME, threadChannel, event.getMember().getIdLong(), anagramLetters));
-
-                        EmbedBuilder anagrameb = new EmbedBuilder();
-                        anagrameb.setTitle("Anagram Game");
-                        anagrameb.setDescription("Starting game in " + GAME_LOAD_TIME + " seconds.\nTry and form as many words as possible using the letters in the title of this thread!\n**Letters: " + anagramLetters + "**");
-                        anagrameb.setColor(new Color(220, 46, 68));
-                        threadChannel.sendMessageEmbeds(anagrameb.build()).queue((countdownEmbedMessage) -> {
-                            Long countdownMessageId = countdownEmbedMessage.getIdLong();
-                            System.err.println(countdownMessageId);
-                            startingTimer.scheduleAtFixedRate(
-                                    new java.util.TimerTask() {
-                                        Integer loadClock = GAME_LOAD_TIME - 1;
-
-                                        @Override
-                                        public void run() {
-                                            if (loadClock != 0) {
-                                                anagrameb.setDescription("Starting game in " + loadClock + " seconds.\nTry and form as many words as possible using the letters in the title of this thread!\n**Letters: " + anagramLetters + "**");
-                                                threadChannel.editMessageEmbedsById(countdownMessageId, anagrameb.build()).queue();
-                                                --loadClock;
-                                                if (anagramHashMap.get("<@" + event.getMember().getIdLong() + "> anagram").isGameAborted()) {
-                                                    loadClock = 0;
-                                                }
-                                            } else {
-                                                Timer gameTimer = new java.util.Timer();
-                                                AnagramSetting currentAnagramSetting = anagramHashMap.get("<@" + event.getMember().getIdLong() + "> anagram");
-                                                if (currentAnagramSetting.isGameAborted()) {
-                                                    EmbedBuilder eb = new EmbedBuilder();
-                                                    threadChannel.sendMessageEmbeds(eb.setTitle("**Game Aborted!**").build()).queue();
-                                                    currentAnagramSetting.setCountTimer(0);
-                                                } else {
-                                                    threadChannel.editMessageEmbedsById(countdownMessageId, currentAnagramSetting.ebBuild()).queue();
-                                                    currentAnagramSetting.decrementCountTimer();
-                                                    currentAnagramSetting.setActive(true);
-                                                }
-
-                                                gameTimer.scheduleAtFixedRate(
-                                                        new java.util.TimerTask() {
-                                                            @Override
-                                                            public void run() {
-                                                                if (currentAnagramSetting.getCountTimer() != 0) {
-                                                                    if (currentAnagramSetting.getCountTimer() == GAME_TOTAL_TIME / 2) {
-                                                                        threadChannel.sendMessage("You have " + currentAnagramSetting.getCountTimer() + " seconds left!").queue();
-                                                                    }
-                                                                    if (currentAnagramSetting.getCountTimer() <= 5) {
-                                                                        threadChannel.sendMessage("You have " + currentAnagramSetting.getCountTimer() + " seconds left!").queue();
-                                                                    }
-                                                                    //                                                                threadChannel.deleteMessageById(countdownMessageId).queue();
-                                                                    //                                                                threadChannel.sendMessageEmbeds(currentAnagramSetting.ebBuild()).queue();
-                                                                    threadChannel.editMessageEmbedsById(countdownMessageId, currentAnagramSetting.ebBuild()).queue();
-                                                                    currentAnagramSetting.decrementCountTimer();
-                                                                } else {
-                                                                    currentAnagramSetting.setActive(false);
-                                                                    currentAnagramSetting.setGameOver(true);
-                                                                    Timer endingTimer = new java.util.Timer();
-                                                                    EmbedBuilder endingEmbed = new EmbedBuilder();
-                                                                    EmbedBuilder closingEmbed = new EmbedBuilder();
-                                                                    closingEmbed.setTitle("**Game is over!**");
-                                                                    threadChannel.sendMessageEmbeds(closingEmbed.setDescription("Thread closing in " + GAME_CLOSE_TIME + " seconds.\nA summary of this game will be reported in <#" + event.getChannel().getIdLong() + "> after this thread is closed\n").build()).queue(closingEmbedMessage -> {
-                                                                        Long closingThreadMessageId = closingEmbedMessage.getIdLong();
-                                                                        endingTimer.scheduleAtFixedRate(
-                                                                                new java.util.TimerTask() {
-                                                                                    Integer closeClock = GAME_CLOSE_TIME - 1;
-
-                                                                                    @Override
-                                                                                    public void run() {
-                                                                                        if (closeClock != 0) {
-                                                                                            closingEmbed.setTitle("**Game is over!**");
-                                                                                            closingEmbed.setDescription("Thread closing in " + closeClock + " seconds.\nA summary of this game will be reported in <#" + event.getChannel().getIdLong() + "> after this thread is closed\n");
-                                                                                            try {
-                                                                                                threadChannel.editMessageEmbedsById(closingThreadMessageId, closingEmbed.build()).queue();
-                                                                                            } catch (Throwable e) {
-                                                                                            }
-
-                                                                                            --closeClock;
-                                                                                        } else {
-                                                                                            if (currentAnagramSetting.isGameAborted()) {
-                                                                                                EmbedBuilder eb = new EmbedBuilder();
-                                                                                                event.getChannel().sendMessageEmbeds(eb.setTitle("**Game Aborted!**").build()).queue();
-                                                                                                endingTimer.cancel();
-                                                                                                gameTimer.cancel();
-                                                                                                startingTimer.cancel();
-                                                                                                anagramHashMap.remove("<@" + event.getMember().getIdLong() + "> anagram");
-                                                                                                threadChannel.delete().queue();
-                                                                                                return;
-                                                                                            }
-                                                                                            endingEmbed.setTitle("**Game is over!**");
-                                                                                            endingEmbed.setColor(currentAnagramSetting.getColor());
-                                                                                            currentAnagramSetting.resetCorrectCounter();
-                                                                                            String embedDescription = "<@" + event.getMember().getId() + "> Your final score was: **" + currentAnagramSetting.getScore() + "**\nYour rank is: " + currentAnagramSetting.getRank() + "\n\nLetters for this anagram: ";
-                                                                                            for (int i = 0; i < anagramLetters.length(); ++i) {
-                                                                                                embedDescription += (anagramLetters.charAt(i) + " ");
-                                                                                            }
-                                                                                            embedDescription += "\nYour longest streak was " + currentAnagramSetting.getLongestStreak() + " words!\n\n";
-                                                                                            Iterator<String> it = currentAnagramSetting.getUsedWords().iterator();
-                                                                                            if (!it.hasNext()) {
-                                                                                                embedDescription += "No words found!\n";
-                                                                                            } else {
-                                                                                                embedDescription += "You found " + currentAnagramSetting.getUsedWords().size() + " words: \n";
-                                                                                                while (it.hasNext()) {
-                                                                                                    String word = it.next();
-                                                                                                    embedDescription += (word + "              " + currentAnagramSetting.getScore(word.length()) + "\n");
-                                                                                                }
-                                                                                            }
-
-                                                                                            endingEmbed.setFooter("Congrats!");
-                                                                                            event.getChannel().sendMessageEmbeds(endingEmbed.setDescription(embedDescription).build()).queue();
-                                                                                            anagramHashMap.remove("<@" + event.getMember().getIdLong() + "> anagram");
-                                                                                            threadChannel.delete().queue();
-                                                                                            endingTimer.cancel();
-                                                                                        }
-                                                                                    }
-                                                                                }, 1000, 1000
-                                                                        );
-                                                                        gameTimer.cancel();
-                                                                    });
-                                                                }
-                                                            }
-                                                        }, 1000, 1000
-                                                );
-                                                startingTimer.cancel();
-                                            }
-                                        }
-                                    }, 1000, 1000
-                            );
-                        });
+                    ((TextChannel) event.getChannel()).createThreadChannel(threadTitle, createThreadMessage.getIdLong()).queue(threadChannel -> {
+                        AnagramSetting currentAnagramSetting = new AnagramSetting(GAME_TOTAL_TIME, event.getChannel(), event.getMember().getIdLong(), anagramLetters, "solo");
+                        AnagramSetting otherAnagramSetting = new AnagramSetting(0, event.getChannel(), event.getMember().getIdLong(), anagramLetters, "solo");
+                        currentAnagramSetting.setThreadChannel(threadChannel);
+                        createAnagramGame(currentAnagramSetting, otherAnagramSetting);
                     });
                 });
             }
@@ -708,19 +588,35 @@ public class Main extends ListenerAdapter {
                     return;
                 }
 
-                Button confirmButton = Button.success("compConfirmButton " + event.getMember().getIdLong() + " " + uid, "Yes");
-                Button cancelButton = Button.danger("compCancelButton " + event.getMember().getIdLong() + " " + uid, "No");
+                final Button confirmButton = Button.success("compConfirmButton " + event.getMember().getIdLong() + " " + uid, "Yes");
+                final Button cancelButton = Button.danger("compCancelButton " + event.getMember().getIdLong() + " " + uid, "No");
 
                 receivedRequestsUsers.add(Long.valueOf(uid));
                 madeRequestsUsers.add(event.getMember().getIdLong());
-
+                final Long recievedRequestUser = Long.valueOf(uid);
                 EmbedBuilder challengeRequestEmbed = new EmbedBuilder();
                 challengeRequestEmbed.setTitle("**Anagram Challenge Request**").setDescription("<@" + event.getMember().getIdLong() + "> wants to challenge you to a 1v1 game of anagram! Do you want to accept?");
-                event.getHook().sendMessageEmbeds(challengeRequestEmbed.build()).setContent("<@" + uid + ">")
+                event.getHook().sendMessageEmbeds(challengeRequestEmbed.build()).setContent("<@" + Long.valueOf(uid) + ">")
                         .addActionRow(
                                 confirmButton,
                                 cancelButton)
-                        .queue();
+                        .queue(message -> {
+                            Timer buttonDisableTimer = new Timer();
+                            buttonDisableTimer.schedule(new TimerTask() {
+                                public void run() {
+                                    if(!confirmButton.isDisabled()) {
+                                        receivedRequestsUsers.remove(Long.valueOf(recievedRequestUser));
+                                        madeRequestsUsers.remove(event.getMember().getIdLong());
+                                        message.editMessageEmbeds(challengeRequestEmbed.build()).setActionRows(
+                                                ActionRow.of(
+                                                        confirmButton.withDisabled(true),
+                                                        cancelButton.withDisabled(true))
+                                        ).queue();
+                                    }
+                                }
+                            }, 120 * 1000);
+                        });
+
             }
             else if(coopOption != null) {
                 String uid = coopOption.getAsString();
@@ -739,9 +635,152 @@ public class Main extends ListenerAdapter {
         }
     }
 
+    public void createAnagramGame(AnagramSetting currentAnagramSetting, AnagramSetting otherAnagramSetting) {
+        Timer startingTimer = new java.util.Timer();
+        Long participantUserId = currentAnagramSetting.getMemberId();
+        ThreadChannel threadChannel = currentAnagramSetting.getThreadChannel();
+        MessageChannel gameChannel = currentAnagramSetting.getGameChannel();
+        String anagramLetters = currentAnagramSetting.getAnagramLetters();
+
+        threadChannel.sendMessage("<@" + participantUserId + "> Your game thread has been created").queue();
+        anagramHashMap.put("<@" + participantUserId + "> anagram", currentAnagramSetting);
+
+        EmbedBuilder anagrameb = new EmbedBuilder();
+        anagrameb.setTitle("Anagram Game");
+        anagrameb.setDescription("Starting game in " + GAME_LOAD_TIME + " seconds.\nTry and form as many words as possible using the letters in the title of this thread!\n**Letters: " + anagramLetters + "**");
+        anagrameb.setColor(new Color(220, 46, 68));
+        threadChannel.sendMessageEmbeds(anagrameb.build()).queue((countdownEmbedMessage) -> {
+            Long countdownMessageId = countdownEmbedMessage.getIdLong();
+            System.err.println(countdownMessageId);
+            startingTimer.scheduleAtFixedRate(
+                    new java.util.TimerTask() {
+                        Integer loadClock = GAME_LOAD_TIME - 1;
+
+                        @Override
+                        public void run() {
+                            if (loadClock > 0) {
+                                anagrameb.setDescription("Starting game in " + loadClock + " seconds.\nTry and form as many words as possible using the letters in the title of this thread!\n**Letters: " + anagramLetters + "**");
+                                threadChannel.editMessageEmbedsById(countdownMessageId, anagrameb.build()).queue();
+                                --loadClock;
+                                if (anagramHashMap.get("<@" + participantUserId + "> anagram").isGameAborted()) {
+                                    loadClock = 0;
+                                }
+                            }
+                            else {
+                                startingTimer.cancel();
+                                Timer gameTimer = new java.util.Timer();
+                                if (currentAnagramSetting.isGameAborted()) {
+                                    EmbedBuilder eb = new EmbedBuilder();
+                                    threadChannel.sendMessageEmbeds(eb.setTitle("**Game Aborted!**").build()).queue();
+                                    currentAnagramSetting.setCountTimer(0);
+                                }
+                                else {
+                                    threadChannel.editMessageEmbedsById(countdownMessageId, currentAnagramSetting.ebBuild()).queue();
+                                    currentAnagramSetting.decrementCountTimer();
+                                    currentAnagramSetting.setActive(true);
+                                }
+
+                                gameTimer.scheduleAtFixedRate(
+                                        new java.util.TimerTask() {
+                                            @Override
+                                            public void run() {
+                                                if (currentAnagramSetting.getCountTimer() > 0) {
+                                                    if (currentAnagramSetting.getCountTimer() == GAME_TOTAL_TIME / 2) {
+                                                        threadChannel.sendMessage("You have " + currentAnagramSetting.getCountTimer() + " seconds left!").queue();
+                                                    }
+                                                    if (currentAnagramSetting.getCountTimer() == GAME_TOTAL_TIME / 4) {
+                                                        threadChannel.sendMessage("You have " + currentAnagramSetting.getCountTimer() + " seconds left!").queue();
+                                                    }
+                                                    if (currentAnagramSetting.getCountTimer() <= 5) {
+                                                        threadChannel.sendMessage("You have " + currentAnagramSetting.getCountTimer() + " seconds left!").queue();
+                                                    }
+                                                    //                                                                threadChannel.deleteMessageById(countdownMessageId).queue();
+                                                    //                                                                threadChannel.sendMessageEmbeds(currentAnagramSetting.ebBuild()).queue();
+                                                    threadChannel.editMessageEmbedsById(countdownMessageId, currentAnagramSetting.ebBuild()).queue();
+                                                    currentAnagramSetting.decrementCountTimer();
+                                                }
+                                                else {
+                                                    gameTimer.cancel();
+                                                    currentAnagramSetting.setActive(false);
+                                                    currentAnagramSetting.setGameOver(true);
+                                                    Timer endingTimer = new java.util.Timer();
+                                                    EmbedBuilder endingEmbed = new EmbedBuilder();
+                                                    EmbedBuilder closingEmbed = new EmbedBuilder();
+                                                    closingEmbed.setTitle("**Game is over!**");
+                                                    threadChannel.sendMessageEmbeds(closingEmbed.setDescription("Thread closing in " + GAME_CLOSE_TIME + " seconds.\nA summary of this game will be reported in <#" + gameChannel.getIdLong() + "> after this thread is closed\n").build()).queue(closingEmbedMessage -> {
+                                                        Long closingThreadMessageId = closingEmbedMessage.getIdLong();
+                                                        endingTimer.scheduleAtFixedRate(
+                                                                new java.util.TimerTask() {
+                                                                    Integer closeClock = GAME_CLOSE_TIME - 1;
+
+                                                                    @Override
+                                                                    public void run() {
+                                                                        if (closeClock > 0) {
+                                                                            closingEmbed.setTitle("**Game is over!**");
+                                                                            closingEmbed.setDescription("Thread closing in " + closeClock + " seconds.\nA summary of this game will be reported in <#" + gameChannel.getIdLong() + "> after this thread is closed\n");
+
+                                                                            threadChannel.editMessageEmbedsById(closingThreadMessageId, closingEmbed.build()).queue();
+
+                                                                            --closeClock;
+                                                                        }
+                                                                        else {
+                                                                            endingTimer.cancel();
+                                                                            if (currentAnagramSetting.isGameAborted()) {
+                                                                                EmbedBuilder eb = new EmbedBuilder();
+                                                                                gameChannel.sendMessageEmbeds(eb.setTitle("**Game Aborted!**").build()).queue();
+                                                                                endingTimer.cancel();
+                                                                                gameTimer.cancel();
+                                                                                startingTimer.cancel();
+                                                                                anagramHashMap.remove("<@" + participantUserId + "> anagram");
+                                                                                threadChannel.delete().queue();
+                                                                                return;
+                                                                            }
+
+                                                                            if(currentAnagramSetting.getGameMode().equals("solo")) {
+                                                                                gameChannel.sendMessageEmbeds(currentAnagramSetting.endingEmbedBuild()).queue();
+                                                                            }
+                                                                            else if(currentAnagramSetting.getGameMode().equals("comp")) {
+                                                                                if(currentAnagramSetting.getFinalScore() > otherAnagramSetting.getFinalScore()) {
+                                                                                    gameChannel.sendMessageEmbeds(currentAnagramSetting.endingEmbedBuild(otherAnagramSetting)).queue();
+
+                                                                                    EmbedBuilder winnerEb = new EmbedBuilder();
+
+                                                                                    winnerEb.setTitle("Competition result:\n");
+                                                                                    winnerEb.setDescription("**<@" + currentAnagramSetting.getMemberId() + "> is the winner!**").setFooter("Congrats!");
+                                                                                    gameChannel.sendMessageEmbeds(winnerEb.build()).queue();
+                                                                                }
+                                                                                else if(currentAnagramSetting.getFinalScore() == otherAnagramSetting.getFinalScore()){
+                                                                                    if(currentAnagramSetting.getMemberId() < otherAnagramSetting.getMemberId()) {
+                                                                                        gameChannel.sendMessageEmbeds(currentAnagramSetting.endingEmbedBuild(otherAnagramSetting)).queue();
+                                                                                        EmbedBuilder drawEb = new EmbedBuilder();
+
+                                                                                        drawEb.setTitle("Competition result: **Draw!**");
+                                                                                        gameChannel.sendMessageEmbeds(drawEb.build()).queue();
+                                                                                    }
+                                                                                }
+                                                                            }
+
+                                                                            anagramHashMap.remove("<@" + participantUserId + "> anagram");
+                                                                            threadChannel.delete().queue();
+                                                                        }
+                                                                    }
+                                                                }, 1000, 1000
+                                                        );
+                                                    });
+
+                                                }
+                                            }
+                                        }, 1000, 1000
+                                );
+                            }
+                        }
+                    }, 1000, 1000
+            );
+        });
+    }
+
     @Override
     public void onButtonInteraction(ButtonInteractionEvent event) {
-        System.err.println("button clicked");
         event.deferReply().queue();
 
         String buttonName = event.getComponentId().split(" ")[0];
@@ -749,16 +788,65 @@ public class Main extends ListenerAdapter {
         String requestedUser = event.getComponentId().split(" ")[2];
 
         if(!requestedUser.equals(String.valueOf(event.getUser().getIdLong()))) {
-            event.getHook().setEphemeral(false).sendMessage("This is not your game request!").queue();
+            event.getHook().setEphemeral(true).sendMessage("This is not your game request!").queue();
             return;
         }
 
-        madeRequestsUsers.remove(event.getUser().getIdLong());
-        receivedRequestsUsers.remove(event.getUser().getIdLong());
+        event.getMessage().getActionRows().forEach(row -> {
+            row = row.asDisabled();
+        });
+
+        EmbedBuilder userChoice = new EmbedBuilder();
+
+        madeRequestsUsers.remove(madeRequestUser);
+        receivedRequestsUsers.remove(requestedUser);
         if(event.getButton().getId().startsWith("compConfirmButton")) {
+            event.getMessage().editMessageEmbeds(userChoice.setTitle("**Game Accepted!**").build()).setActionRows().queue();
             event.getHook().sendMessage("Creating threads.").queue();
+
+            String letters = "";
+            String title1 = "<@" + madeRequestUser + "> anagram; ";
+            String title2 = "<@" + requestedUser + "> anagram; ";
+            for (int i = 0; i < NUM_LETTERS; ++i) {
+                if (i < NUM_VOWELS) {
+                    letters += VOWELS[(int) (Math.random() * VOWELS.length)];
+                } else {
+                    letters += CONSONANTS[(int) (Math.random() * CONSONANTS.length)];
+                }
+            }
+
+            char tempArray[] = letters.toCharArray();
+            Arrays.sort(tempArray);
+            letters = new String(tempArray);
+
+            for (int i = 0; i < NUM_LETTERS; ++i) {
+                title1 += (String.valueOf(letters.charAt(i)).toUpperCase() + " ");
+                title2 += (String.valueOf(letters.charAt(i)).toUpperCase() + " ");
+            }
+
+            final String threadTitle1 = title1;
+            final String threadTitle2 = title2;
+            final String anagramLetters = letters;
+
+            AnagramSetting currentAnagramSetting = new AnagramSetting(GAME_TOTAL_TIME, event.getChannel(), Long.valueOf(madeRequestUser), anagramLetters, "comp");
+            AnagramSetting otherAnagramSetting = new AnagramSetting(GAME_TOTAL_TIME, event.getChannel(), Long.valueOf(requestedUser), anagramLetters, "comp");
+
+            event.getHook().sendMessage("Creating a thread for <@" + madeRequestUser + ">").queue(createThreadMessage -> {
+                ((TextChannel) event.getChannel()).createThreadChannel(threadTitle1, createThreadMessage.getIdLong()).queue(threadChannel -> {
+                    currentAnagramSetting.setThreadChannel(threadChannel);
+                    createAnagramGame(currentAnagramSetting, otherAnagramSetting);
+                });
+            });
+
+            event.getHook().sendMessage("Creating a thread for <@" + requestedUser + ">").queue(createThreadMessage -> {
+                ((TextChannel) event.getChannel()).createThreadChannel(threadTitle2, createThreadMessage.getIdLong()).queue(threadChannel -> {
+                    otherAnagramSetting.setThreadChannel(threadChannel);
+                    createAnagramGame(otherAnagramSetting, currentAnagramSetting);
+                });
+            });
         }
         else if(event.getButton().getId().startsWith("compCancelButton")) {
+            event.getMessage().editMessageEmbeds(userChoice.setTitle("**Game Declined.**").build()).setActionRows().queue();
             event.getHook().sendMessage("Canceling game request.").queue();
         }
     }

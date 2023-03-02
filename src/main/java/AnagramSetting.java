@@ -1,9 +1,12 @@
 import net.dv8tion.jda.api.EmbedBuilder;
+import net.dv8tion.jda.api.entities.MessageChannel;
 import net.dv8tion.jda.api.entities.MessageEmbed;
 import net.dv8tion.jda.api.entities.ThreadChannel;
 
 import java.awt.*;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 
 public class AnagramSetting {
     private static final int VALID = 1;
@@ -11,21 +14,26 @@ public class AnagramSetting {
     private static final int USED = 0;
     int countTimer, score, messageCounter, correctCounter;
     ThreadChannel threadChannel;
-    String msgheader, lastmessage, lastmessage2, lastmessage3;
+    MessageChannel gameChannel;
+    String lastmessage;
+    String gameMode;
     String anagramLetters;
-    Long memberId;
-    EmbedBuilder eb;
+    long memberId;
+    EmbedBuilder eb, endingEmbed;
     boolean active, gameOver, gameAborted;
     int[] anagramFreqArray = new int[26];
     int[] messageFreqArray = new int[26];
+    HashMap<String, String> wordToFinderHashMap = new HashMap<>();
     HashSet<String> usedWords = new HashSet<>();
+    HashSet<Long> participants = new HashSet<>();
     int longestStreak = 0;
 
-    public AnagramSetting(int startingTime, ThreadChannel threadChannel, Long memberId, String anagramLetters) {
+    public AnagramSetting(int startingTime, MessageChannel gameChannel, Long memberId, String anagramLetters, String gameMode) {
         countTimer = startingTime;
-        this.threadChannel = threadChannel;
+        this.gameChannel = gameChannel;
         this.memberId = memberId;
         this.anagramLetters = anagramLetters;
+        this.gameMode = gameMode;
 
         for(int i = 0; i < anagramLetters.length(); ++i) {
             ++anagramFreqArray[anagramLetters.charAt(i) - 'a'];
@@ -33,15 +41,17 @@ public class AnagramSetting {
 
         score = 0;
         eb = new EmbedBuilder();
+        endingEmbed = new EmbedBuilder();
         active = false;
         gameOver = false;
         gameAborted = false;
         messageCounter = 0;
 
-        msgheader = lastmessage = lastmessage2 = lastmessage3 = "";
+        lastmessage = "";
         correctCounter = 0;
     }
 
+    public void addParticipant(long participantId) { participants.add(participantId); }
     public void updateLongestStreak() { longestStreak = Math.max(longestStreak, getCorrectCounter()); }
     public void setCountTimer(int count) { this.countTimer = count; }
     public void updateScore(int delta) { this.score += getScore(delta); }
@@ -55,19 +65,28 @@ public class AnagramSetting {
         return eb.setColor(getColor()).setTitle("**Game is Running!** Find as many words as possible!").setDescription("**Letters are in the title of this thread.** You can use setting prefix + quit to quit at anytime" + "\n"
                 + "Timer: " + countTimer + "\tScore: " + score + " " + lastmessage + "\n").build();
     }
+    public String getGameMode() { return gameMode; }
+    public ThreadChannel getThreadChannel() { return threadChannel; }
+    public MessageChannel getGameChannel() { return gameChannel; }
+    public void setThreadChannel(ThreadChannel threadChannel) { this.threadChannel = threadChannel; }
     public int getMessageCounter() { return messageCounter; }
     public void decrementCountTimer() { countTimer--; }
     public void incMessageCounter() { ++messageCounter; }
     public void incCorrectCounter() { ++correctCounter; }
     public void resetMessageCounter() { messageCounter = 0; }
     public void resetCorrectCounter() { correctCounter = 0; }
-    public Integer getCountTimer() { return countTimer; }
-    public Integer getScore() { return score; }
-    public Long getMemberId() { return memberId; }
-    public Boolean isActive() { return active; }
-    public Boolean isGameAborted() { return gameAborted; }
-    public Integer getLongestStreak() { return longestStreak; }
-    public Integer getScore(Integer len) {
+    public void addWord(String word, String participantName) {
+        wordToFinderHashMap.put(word, participantName);
+    }
+
+    public int getCountTimer() { return countTimer; }
+    public int getFinalScore() { return score; }
+    public long getMemberId() { return memberId; }
+    public boolean isActive() { return active; }
+    public boolean isGameAborted() { return gameMode.equals("solo") && gameAborted; }
+    public boolean isParticipant(long participantId) { return participants.contains(participantId); }
+    public int getLongestStreak() { return longestStreak; }
+    public int getScore(Integer len) {
         int streakBonus = 0;
 
         if(correctCounter >= 10) {
@@ -82,10 +101,11 @@ public class AnagramSetting {
 
         return roundToHundreds(Main.SCORE_A * len * len + Main.SCORE_B * len + Main.SCORE_C) + streakBonus;
     }
-    public Boolean isGameOver() { return gameOver; }
+
+    public boolean isGameOver() { return gameOver; }
     public String getAnagramLetters() { return anagramLetters; }
-    public Integer getCorrectCounter() { return correctCounter; }
-    public Integer isValid(String message) {
+    public int getCorrectCounter() { return correctCounter; }
+    public int isValid(String message) {
         for(int i = 0; i < 26; ++i) {
             messageFreqArray[i] = 0;
         }
@@ -110,10 +130,106 @@ public class AnagramSetting {
         return VALID;
     }
 
-    private Integer roundToHundreds(Double num) {
+    private int roundToHundreds(double num) {
         return 100 * Math.round((int)(num / 100));
     }
     public HashSet<String> getUsedWords() { return usedWords; }
+    public HashMap<String, String> getWordToFinderHashMap() { return wordToFinderHashMap; }
+
+    public MessageEmbed endingEmbedBuild() {
+        if(gameMode.equals("solo")) {
+            endingEmbed.setTitle("**Game is over!**");
+            endingEmbed.setColor(getColor());
+            resetCorrectCounter();
+            String embedDescription = "<@" + memberId + "> Your final score was: **" + getFinalScore() + "**\nYour rank is: " + getRank() + "\n\nLetters for this anagram: ";
+            for (int i = 0; i < anagramLetters.length(); ++i) {
+                embedDescription += (anagramLetters.charAt(i) + " ");
+            }
+            embedDescription += "\nYour longest streak was " + getLongestStreak() + " words!\n\n";
+            Iterator<String> it = getUsedWords().iterator();
+            if (!it.hasNext()) {
+                embedDescription += "No words found!\n";
+            }
+            else {
+                embedDescription += "You found " + getUsedWords().size() + " words: \n";
+                while (it.hasNext()) {
+                    String word = it.next();
+                    embedDescription += (word + "\t" + getScore(word.length()) + "\n");
+                }
+            }
+
+            endingEmbed.setDescription(embedDescription).setFooter("Congrats!");
+        }
+        else if(gameMode.equals("coop")) {
+            endingEmbed.setTitle("**Coop game is over!**");
+            resetCorrectCounter();
+
+            String embedDescription = "Participants in this anagram: ";
+            Iterator<Long> it = participants.iterator();
+            while(it.hasNext()) {
+                long participantId = it.next();
+
+                embedDescription += "<@" + participantId + ">";
+            }
+            embedDescription += "\n\n";
+
+            Iterator<String> it1 = getUsedWords().iterator();
+            if (!it1.hasNext()) {
+                embedDescription += "No words found!\n";
+            }
+            else {
+                embedDescription += "You found " + getUsedWords().size() + " words: \n";
+                while (it1.hasNext()) {
+                    String word = it1.next();
+                    embedDescription += (word + " (" + wordToFinderHashMap.get(word) + ")\t" + getScore(word.length()) + "\n");
+                }
+            }
+        }
+
+        return endingEmbed.build();
+    }
+
+    public MessageEmbed endingEmbedBuild(AnagramSetting opponentAnagramSetting) {
+        if(gameMode.equals("comp")) {
+            endingEmbed.setTitle("**Competition is over!**");
+            String embedDescription = "Letters for this anagram: **";
+            resetCorrectCounter();
+
+            for (int i = 0; i < anagramLetters.length(); ++i) {
+                embedDescription += (anagramLetters.charAt(i) + " ");
+            }
+            embedDescription += "**\n\n<@" + memberId + "> Your final score was: **" + getFinalScore() + "**\n";
+
+            Iterator<String> it = getUsedWords().iterator();
+            if (!it.hasNext()) {
+                embedDescription += "No words found!\n";
+            }
+            else {
+                embedDescription += "You found " + getUsedWords().size() + " words: \n";
+                while (it.hasNext()) {
+                    String word = it.next();
+                    embedDescription += (word + "\t" + getScore(word.length()) + "\n");
+                }
+            }
+
+            embedDescription += "\n\n<@" + opponentAnagramSetting.getMemberId() + "> Your final score was: **" + opponentAnagramSetting.getFinalScore() + "**\n";
+
+            Iterator<String> it2 = opponentAnagramSetting.getUsedWords().iterator();
+            if (!it2.hasNext()) {
+                embedDescription += "No words found!\n";
+            }
+            else {
+                embedDescription += "You found " + opponentAnagramSetting.getUsedWords().size() + " words: \n";
+                while (it2.hasNext()) {
+                    String word = it2.next();
+                    embedDescription += (word + "\t" + getScore(word.length()) + "\n");
+                }
+            }
+            endingEmbed.setDescription(embedDescription);
+        }
+
+        return endingEmbed.build();
+    }
 
     public Color getColor() {
         if(score >= 88888) {
@@ -154,8 +270,8 @@ public class AnagramSetting {
     }
 
     public String getRank() {
-        if(score >= 888888) {
-            return ("***__ASIAN (8888888+)__***");
+        if(score >= 88888) {
+            return ("***__ASIAN (88888+)__***");
         }
         if(score >= Main.GOD_SCORE) {
             return ("***__GOD (" + Main.GOD_SCORE + "+)__***");
