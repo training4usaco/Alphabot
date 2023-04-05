@@ -166,10 +166,10 @@ public class Main extends ListenerAdapter {
                     currAnagramSetting.resetCorrectCounter();
                     return;
                 }
-                if (currAnagramSetting.getHostId() != event.getAuthor().getIdLong() && !currAnagramSetting.isParticipant(event.getAuthor().getIdLong())) {
-                    event.getThreadChannel().deleteMessageById(thread.getLatestMessageId()).queue();
-                    return;
-                }
+//                if (currAnagramSetting.getHostId() != event.getAuthor().getIdLong() && !currAnagramSetting.isParticipant(event.getAuthor().getIdLong())) {
+//                    event.getThreadChannel().deleteMessageById(thread.getLatestMessageId()).queue();
+//                    return;
+//                }
                 if (message.startsWith(currentGuildSetting.getSettingsPrefix())) {
                     message = message.substring(currentGuildSetting.getSettingsPrefix().length());
                     if (currAnagramSetting.getGameMode().equals("solo") && message.startsWith("quit")) {
@@ -227,6 +227,61 @@ public class Main extends ListenerAdapter {
                 }
                 else if (validity == 0) {
                     event.getMessage().addReaction("U+1F7E1").queue();
+                }
+                return;
+            }
+
+            if (this.hotpotatoHashMap.containsKey(channelKey.substring(0, 13 + String.valueOf(event.getMember().getIdLong()).length()))) {
+                channelKey = channelKey.substring(0, 13 + String.valueOf(event.getMember().getIdLong()).length());
+            }
+            else if (this.hotpotatoHashMap.containsKey(channelKey.substring(0, 12 + String.valueOf(event.getMember().getIdLong()).length()))) {
+                channelKey = channelKey.substring(0, 12 + String.valueOf(event.getMember().getIdLong()).length());
+            }
+            if(hotpotatoHashMap.containsKey(channelKey)) {
+                message = message.toLowerCase();
+                final ThreadChannel thread = event.getThreadChannel();
+                final HotPotatoSetting currHotpotatoSetting = hotpotatoHashMap.get(channelKey);
+
+//                if (currHotpotatoSetting.getHostId() != event.getAuthor().getIdLong() && !currHotpotatoSetting.isParticipant(event.getAuthor().getIdLong())) {
+//                    event.getThreadChannel().deleteMessageById(thread.getLatestMessageId()).queue();
+//                    return;
+//                }
+
+                if(currHotpotatoSetting.isGameOver()) {
+                    return;
+                }
+                if (!currHotpotatoSetting.isActive() && !currHotpotatoSetting.isGameOver()) {
+                    thread.sendMessage("Please wait for the game to start!").queue();
+                    return;
+                }
+
+                if(event.getAuthor().getIdLong() == currHotpotatoSetting.getCurrentParticipantId()) {
+                    if(!WordBank.contains(message)) {
+                        event.getMessage().addReaction("U+274C").queue();
+                        return;
+                    }
+
+                    if(currHotpotatoSetting.isUsedWord(message)) {
+                        event.getMessage().addReaction("U+274C").queue();
+                        return;
+                    }
+
+                    String prevWord = currHotpotatoSetting.getPrevWord();
+                    if(message.startsWith(prevWord.substring(prevWord.length() - 1))) {
+                        event.getMessage().addReaction("U+1F954").queue();
+                        currHotpotatoSetting.setPrevWord(message);
+                        currHotpotatoSetting.incrementCurrentParticipantIndex();
+                        currHotpotatoSetting.addUsedWord(message);
+                        currHotpotatoSetting.incrementMessageCount();
+                        if(currHotpotatoSetting.getMessageCount() % 5 == 0) {
+                            currHotpotatoSetting.decrementMaxTime();
+                        }
+                        currHotpotatoSetting.resetCountTimer();
+                        thread.sendMessage("<@" + currHotpotatoSetting.getCurrentParticipantId() + "> it is your turn!").queue();
+                    }
+                    else {
+                        event.getMessage().addReaction("U+274C").queue();
+                    }
                 }
             }
         }
@@ -718,7 +773,7 @@ public class Main extends ListenerAdapter {
             Button startButton = Button.success("hotpotatoStartButton " + event.getMember().getIdLong(), "Start");
             Button cancelButton = Button.danger("hotpotatoCancelButton " + event.getMember().getIdLong(), "Cancel");
             hotPotatoGameAnnouncementEmbed.setTitle("**Hot Potato game!**").setDescription("<@" + event.getMember().getIdLong() + "> is hosting a hot potato game! React with anything to join\nStart the game by pressing the \"Start\" button!");
-            HotPotatoSetting currentHotPotatoSetting = new HotPotatoSetting(event.getMember().getIdLong(), startWord, event.getChannel(), GAME_HOTPOTATO_TIME);
+            HotPotatoSetting currentHotPotatoSetting = new HotPotatoSetting(event.getMember().getIdLong(), startWord, event.getChannel());
 
             event.getHook().sendMessageEmbeds(hotPotatoGameAnnouncementEmbed.build()).addActionRow(new ItemComponent[]{startButton, cancelButton}).queue((message) -> {
                 message.addReaction("U+1F44D").queue();
@@ -760,10 +815,15 @@ public class Main extends ListenerAdapter {
             if (event.getMember().getIdLong() == messageHotPotatoHashMap.get(event.getMessageIdLong()).getHostId()) {
                 return;
             }
+            if (messageHotPotatoHashMap.get(event.getMessageIdLong()).isParticipant(event.getMember().getIdLong())) {
+                return;
+            }
             if (this.hotpotatoHashMap.containsKey("<@" + event.getMember().getIdLong() + "> hotpotato")) {
                 event.getChannel().sendMessage("Sorry, you have a game currently running!").queue();
                 return;
             }
+            event.getChannel().sendMessage("Added <@" + event.getMember().getIdLong() + "> to hotpotato game!").queue();
+            messageHotPotatoHashMap.get(event.getMessageIdLong()).addParticipant(event.getMember().getIdLong());
         }
     }
 
@@ -775,22 +835,32 @@ public class Main extends ListenerAdapter {
         final String hotPotatoWord = currentHotPotatoSetting.getPrevWord();
         threadChannel.sendMessage("<@" + participantUserId + "> Your game thread has been created").queue();
         String participantsPing = "";
-
         final HashSet<Long> participants = currentHotPotatoSetting.getParticipants();
         final Iterator<Long> it = participants.iterator();
         while (it.hasNext()) {
-            participantsPing = participantsPing + "<@" + it.next() + ">";
+            long participant = it.next();
+            participantsPing = participantsPing + "<@" + participant + ">";
         }
         if (participantsPing.length() > 0) {
             threadChannel.sendMessage(participantsPing).queue();
         }
 
+        currentHotPotatoSetting.initParticipantOrder();
         hotpotatoHashMap.put("<@" + participantUserId + "> hotpotato", currentHotPotatoSetting);
 
         final EmbedBuilder hotpotatoeb = new EmbedBuilder();
         hotpotatoeb.setTitle("Hot Potato Game");
+
+        String participantOrderList = "Participants order:\n";
+
+        ArrayList<Long> participantOrder = currentHotPotatoSetting.getParticipantOrder();
+        for (int i = 0; i < participantOrder.size(); ++i) {
+            participantOrderList += "<@" + participantOrder.get(i) + ">\n";
+        }
+
+        final String participantOrderString = participantOrderList;
         hotpotatoeb.setDescription("Starting game in 10 seconds.\nTake turns to form words starting with the previous word's last letter!" +
-                "\n\n**Current Word:** " + hotPotatoWord);
+                "\n\n**Current Word:** " + hotPotatoWord + "\n" + participantOrderList);
         hotpotatoeb.setColor(new Color(220, 46, 68));
 
         threadChannel.sendMessageEmbeds(hotpotatoeb.build(), new MessageEmbed[0]).queue(countdownEmbedMessage -> {
@@ -801,7 +871,7 @@ public class Main extends ListenerAdapter {
                 public void run() {
                     if (this.loadClock > 0) {
                         hotpotatoeb.setDescription("Starting game in " + this.loadClock + " seconds.\nTake turns to form words starting with the previous word's last letter!" +
-                                "\n\n**Current Word:** " + hotPotatoWord);
+                                "\n\n**Current Word:** " + hotPotatoWord + "\n" + participantOrderString);
                         threadChannel.editMessageEmbedsById(countdownMessageId, new MessageEmbed[]{hotpotatoeb.build()}).queue();
                         this.loadClock = this.loadClock - 1;
                     }
@@ -812,6 +882,65 @@ public class Main extends ListenerAdapter {
                         threadChannel.editMessageEmbedsById(countdownMessageId, new MessageEmbed[]{currentHotPotatoSetting.ebBuild()}).queue();
                         currentHotPotatoSetting.decrementCountTimer();
                         currentHotPotatoSetting.setActive(true);
+                        currentHotPotatoSetting.resetCountTimer();
+
+                        gameTimer.scheduleAtFixedRate(new TimerTask() {
+                            public void run() {
+                                if (currentHotPotatoSetting.getCountTimer() > 0) {
+                                    if (currentHotPotatoSetting.getCountTimer() <= 3) {
+                                        threadChannel.sendMessage("There are " + currentHotPotatoSetting.getCountTimer() + " seconds left!").queue();
+                                    }
+
+                                    threadChannel.editMessageEmbedsById(countdownMessageId, new MessageEmbed[]{currentHotPotatoSetting.ebBuild()}).queue();
+                                    currentHotPotatoSetting.decrementCountTimer();
+                                }
+                                else {
+                                    gameTimer.cancel();
+                                    currentHotPotatoSetting.setActive(false);
+                                    currentHotPotatoSetting.setGameOver(true);
+
+                                    Timer endingTimer = new Timer();
+                                    new EmbedBuilder();
+                                    EmbedBuilder closingEmbed = new EmbedBuilder();
+                                    closingEmbed.setTitle("**Game is over!**");
+                                    threadChannel.sendMessage(":boom:").queue();
+                                    threadChannel.sendMessageEmbeds(closingEmbed.setDescription("Thread closing in " + GAME_CLOSE_TIME + " seconds.\nA summary of this game will be reported in <#" + gameChannel.getIdLong() + "> after this thread is closed\n").build(), new MessageEmbed[0]).queue((closingEmbedMessage) -> {
+                                        final Long closingThreadMessageId = closingEmbedMessage.getIdLong();
+                                        endingTimer.scheduleAtFixedRate(new TimerTask() {
+                                            Integer closeClock = GAME_CLOSE_TIME - 1;
+
+                                            public void run() {
+                                                if (this.closeClock > 0) {
+                                                    closingEmbed.setTitle("**Game is over!**");
+                                                    closingEmbed.setDescription("Thread closing in " + this.closeClock + " seconds.\nA summary of this game will be reported in <#" + gameChannel.getIdLong() + "> after this thread is closed\n");
+                                                    threadChannel.editMessageEmbedsById(closingThreadMessageId, new MessageEmbed[]{closingEmbed.build()}).queue();
+                                                    this.closeClock = this.closeClock - 1;
+                                                }
+                                                else {
+                                                    endingTimer.cancel();
+
+                                                    EmbedBuilder eb = new EmbedBuilder();
+                                                    eb.setTitle("**Game is over!** :potato:");
+                                                    eb.setColor(new Color(232, 234, 255));
+
+                                                    String ebDescription = "<@" + currentHotPotatoSetting.getCurrentParticipantId() + "> couldn't come up with a word in time!! You lose!!!\nWords Found:\n";
+                                                    HashSet<String> words = currentHotPotatoSetting.getUsedWords();
+
+                                                    for(String word : words) {
+                                                        ebDescription = ebDescription + word + "\n";
+                                                    }
+                                                    eb.setDescription(ebDescription);
+                                                    gameChannel.sendMessageEmbeds(eb.build()).queue();
+                                                    hotpotatoHashMap.remove("<@" + participantUserId + "> hotpotato");
+                                                    threadChannel.delete().queue();
+                                                }
+
+                                            }
+                                        }, 1000L, 1000L);
+                                    });
+                                }
+                            }
+                        }, 1000L, 1000L);
                     }
                 }
             }, 1000L, 1000L);
@@ -1066,15 +1195,16 @@ public class Main extends ListenerAdapter {
                 event.getHook().sendMessage("Creating a new thread").queue(createThreadMessage -> ((TextChannel) event.getChannel()).createThreadChannel(threadTitle, createThreadMessage.getIdLong()).queue(threadChannel -> {
                     messageHotPotatoHashMap.get(event.getMessageIdLong()).setThreadChannel(threadChannel);
                     createHotPotatoGame(messageHotPotatoHashMap.get(event.getMessageIdLong()));
-                    coopMessageAnagramHashMap.remove(event.getMessageIdLong());
+                    messageHotPotatoHashMap.remove(event.getMessageIdLong());
                 }));
             }
             else if (buttonName.startsWith("hotpotatoCancelButton")) {
                 final EmbedBuilder eb = new EmbedBuilder();
                 event.getMessage().editMessageEmbeds(eb.setTitle("**Coop game cancelled.**").build()).setActionRows(new ActionRow[0]).queue();
                 event.getHook().sendMessage("Cancelled!").queue();
-                this.coopMessageAnagramHashMap.remove(event.getMessage().getIdLong());
+                messageHotPotatoHashMap.remove(event.getMessageIdLong());
             }
+
         }
     }
 

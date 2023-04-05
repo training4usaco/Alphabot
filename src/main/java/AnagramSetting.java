@@ -180,7 +180,7 @@ public class AnagramSetting {
             streakBonus = 50;
         }
 
-        return this.roundToHundreds(Main.SCORE_A * (double)len * (double)len + -Main.SCORE_B * (double)len + Main.SCORE_C) + streakBonus;
+        return this.roundToHundreds(Main.SCORE_A * (double)len * (double)len + Main.SCORE_B * (double)len + Main.SCORE_C) + streakBonus;
     }
 
     public HashSet<Long> getParticipants() {
