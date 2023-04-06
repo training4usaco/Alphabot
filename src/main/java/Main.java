@@ -142,14 +142,11 @@ public class Main extends ListenerAdapter {
             return;
         }
         final long guildId = event.getGuild().getIdLong();
-        String message = event.getMessage().getContentRaw();
+        String message = event.getMessage().getContentRaw().toLowerCase();
         final GuildSetting currentGuildSetting = this.guildSettingHashMap.get(guildId);
         final MessageChannel channel = event.getChannel();
-        System.err.println("\u001b[36mMessage received: " + message + " in channel " + channel.getName() + " in guild " + event.getGuild().getName() + " from " + event.getMember().getNickname() + "\u001b[0m");
-        if (currentGuildSetting == null) {
-            channel.sendMessage("please set up guild settings").queue();
-            return;
-        }
+//        System.err.println("\u001b[36mMessage received: " + message + " in channel " + channel.getName() + " in guild " + event.getGuild().getName() + " from " + event.getMember().getNickname() + "\u001b[0m");
+
         if (event.getChannelType().equals(ChannelType.GUILD_PUBLIC_THREAD)) {
             String channelKey = event.getThreadChannel().getName();
             if (this.anagramHashMap.containsKey(channelKey.substring(0, 11 + String.valueOf(event.getMember().getIdLong()).length()))) {
@@ -275,7 +272,9 @@ public class Main extends ListenerAdapter {
                         currHotpotatoSetting.incrementMessageCount();
                         if(currHotpotatoSetting.getMessageCount() % 5 == 0) {
                             currHotpotatoSetting.decrementMaxTime();
+                            thread.sendMessage("Time decreased!").queue();
                         }
+                        thread.sendMessage("There are " + currHotpotatoSetting.getCountTimer() + " seconds left!").queue();
                         currHotpotatoSetting.resetCountTimer();
                         thread.sendMessage("<@" + currHotpotatoSetting.getCurrentParticipantId() + "> it is your turn!").queue();
                     }
@@ -284,6 +283,7 @@ public class Main extends ListenerAdapter {
                     }
                 }
             }
+            return;
         }
         if (message.startsWith(currentGuildSetting.getSettingsPrefix())) {
             message = message.substring(currentGuildSetting.getSettingsPrefix().length());
@@ -480,23 +480,101 @@ public class Main extends ListenerAdapter {
         else if (event.getName().equals("abchelp")) {
             final OptionMapping page = event.getOption("page");
             if (page == null || page.getAsInt() == 1) {
-                final EmbedBuilder eb = new EmbedBuilder().setTitle("ALPHABOT HELP").setDescription("**Use `/abcsettings` to see current Alphabot settings and prefixes**\n\nThank you for using **Alphabot**!\nThis bot was made to help you learn your abc's and a few word minigames!\n\n**General Help**\nFor counting make sure you set a counting channel! (see page 2 for more info)\nCheckout page 3-4 for more info on Anagram and how to play!\n\n**Enjoy!**");
+                final EmbedBuilder eb = new EmbedBuilder().setTitle("ALPHABOT HELP").setDescription("**Use `/abcsettings` to see current Alphabot settings and prefixes**\n\n" +
+                        "Thank you for using **Alphabot**!\nThis bot was made to help you learn your abc's and a few word minigames!\n\n" +
+                        "**General Help**\n" +
+                        "For counting make sure you set a counting channel! (see page 2 for more info)\n" +
+                        "Checkout page 3-4 for more info on Anagram and how to play!\n" +
+                        "Checkout page 5 for more info on how to play hotpotato!\n\n" +
+                        "**Enjoy!**");
                 eb.setFooter("Page 1").setColor(new Color(232, 29, 99));
                 event.getHook().sendMessageEmbeds(eb.build(), new MessageEmbed[0]).queue();
             }
             else if (page.getAsInt() == 2) {
-                final EmbedBuilder eb = new EmbedBuilder().setTitle("COUNTING HELP").setDescription("**Note that commands without slash use the prefix**\n\n**How to Count**\nJust your classic abc's...\nUntil you reach z, after which it will reset back to aa which is followed by the normal abc's with an extra a in front.\nOnce you reach az, the a will be incremented so the next number will be ba, and so on.\nEventually, once you get to zz it will reset back to aaa just like normal counting.\n\n**Counting Rules**\nYou can't count twice in a row\n\n**Setup Commands**\n\u25c8 `setChannel` sets the channel that counting will be tracked in\n\u25c8 `setCountingPrefix` sets the prefix for counting\n\u25c8 `setPrefix` sets the prefix for bot commands\n\n**Counting Commands**\n\u25c8 `start` - enables counting\n\u25c8 `end` - disables counting\n\u25c8 `/abcPrefReq on/off` - sets whether or not prefix is required to count\n");
+                final EmbedBuilder eb = new EmbedBuilder().setTitle("COUNTING HELP").setDescription("**Note that commands without slash use the prefix**\n\n" +
+                        "**How to Count**\n" +
+                        "Just your classic abc's...\n" +
+                        "Until you reach z, after which it will reset back to aa which is followed by the normal abc's with an extra a in front.\n" +
+                        "Once you reach az, the a will be incremented so the next number will be ba, and so on.\n" +
+                        "Eventually, once you get to zz it will reset back to aaa just like normal counting.\n\n" +
+                        "**Counting Rules**\n" +
+                        "You can't count twice in a row\n\n" +
+                        "**Setup Commands**\n" +
+                        "\u25c8 `setChannel` sets the channel that counting will be tracked in\n" +
+                        "\u25c8 `setCountingPrefix` sets the prefix for counting\n" +
+                        "\u25c8 `setPrefix` sets the prefix for bot commands\n\n" +
+                        "**Counting Commands**\n\u25c8 `start` - enables counting\n" +
+                        "\u25c8 `end` - disables counting\n" +
+                        "\u25c8 `/abcPrefReq on/off` - sets whether or not prefix is required to count\n");
                 eb.setFooter("Page 2").setColor(new Color(248, 162, 6));
                 event.getHook().sendMessageEmbeds(eb.build(), new MessageEmbed[0]).queue();
             }
             else if (page.getAsInt() == 3) {
-                final EmbedBuilder eb = new EmbedBuilder().setTitle("ANAGRAM HELP").setDescription("**Scoring and Rank system is on the next page**\n\n**How to Play**\nYou will have 60 seconds to try and form as many words as possible using the letters provided the title of the thread.\nEvery 5 messages the bot will resend the letters.\n\n**Slash Commands**\n\u25c8 `abcanagram` - creates an anagram game!\n\u25c8 `abcanagram` comp - Lets you play a competitve game against someone of your choice where both people get the same letters! Type in the @ of the person you want to play a game against!\n\u25c8 `abcanagram` coop - Creates a game that people can join by reacting so multiple people can participate! Type yes for auto start (30 seconds) or no for buttons to start\n**Prefix Commands**\n\u25c8 `quit` type in the thread of the game to quit the game\n\n**Reactions**\n\u2705 - found an anagram\n\u274c - not an anagram (doesn't use right letters or isn't a word and resets your streak)\n:yellow_circle: - word already found (does not break your streak)\n\u2b50 - streak of 3 or more\n:star2: - streak of 5 or more\n:dizzy: - streak of 10 or more\n");
+                final EmbedBuilder eb = new EmbedBuilder().setTitle("ANAGRAM HELP").setDescription("**Scoring and Rank system is on the next page**\n\n" +
+                        "**How to Play**\n" +
+                        "You will have 60 seconds to try and form as many words as possible using the letters provided the title of the thread.\n" +
+                        "Every 5 messages the bot will resend the letters.\n\n" +
+                        "**Slash Commands**\n" +
+                        "\u25c8 `abcanagram` - creates an anagram game!\n" +
+                        "\u25c8 `abcanagram` comp - Lets you play a competitve game against someone of your choice where both people get the same letters! Type in the @ of the person you want to play a game against!\n" +
+                        "\u25c8 `abcanagram` coop - Creates a game that people can join by reacting so multiple people can participate! Type yes for auto start (30 seconds) or no for buttons to start\n" +
+                        "**Prefix Commands**\n" +
+                        "\u25c8 `quit` type in the thread of the game to quit the game\n\n" +
+                        "**Reactions**\n" +
+                        "\u2705 - found an anagram\n" +
+                        "\u274c - not an anagram (doesn't use right letters or isn't a word and resets your streak)\n" +
+                        ":yellow_circle: - word already found (does not break your streak)\n" +
+                        "\u2b50 - streak of 3 or more\n" +
+                        ":star2: - streak of 5 or more\n" +
+                        ":dizzy: - streak of 10 or more\n");
                 eb.setFooter("Page 3").setColor(new Color(248, 201, 91));
                 event.getHook().sendMessageEmbeds(eb.build(), new MessageEmbed[0]).queue();
             }
             else if (page.getAsInt() == 4) {
-                final EmbedBuilder eb = new EmbedBuilder().setTitle("ANAGRAM SCORING").setDescription("**Scoring system can be seen while playing the game**\n\n\u25c8 **How to gain points**\n\u25c8 Scoring will be based on length of word and streak.\n\u25c8 Correct words increase your streak, while incorrect words reset it (note used words doesn't affect your streak).\n\n\u25c8 **Points System (Rest can be seen in game)**\n\u25c8 Words of length <= 2 are not counted.\n\u25c8 Words of length 3 are worth " + this.getRawScore(3) + " points\n\u25c8 Words of length 4 are worth " + this.getRawScore(4) + " points\n\u25c8 Words of length 5 are worth " + this.getRawScore(5) + " points\n\u25c8 Words of length 6 are worth " + this.getRawScore(6) + " points\n\u25c8 Words of length 7 are worth " + this.getRawScore(7) + " points\n\u25c8 Words of length 8 are worth " + this.getRawScore(8) + " points\n\n**Streak System**\n\u25c8 Streak of 3 adds an extra 50 points per message\n\u25c8 Streak of 5 adds an extra 150 points per message\n\u25c8 Streak of 10 adds an extra streak x 50 points per message\n\n**Ranks**\n\u25c8 ***__GOD (" + GOD_SCORE + "+)__***\n\u25c8 ***LEGENDARY (" + LEGENDARY_SCORE + "-" + (GOD_SCORE - 1) + ")***\n\u25c8 ***Mythical (" + MYTHICAL_SCORE + "-" + (GOD_SCORE - 1) + ")***\n\u25c8 ***Guru (" + GURU_SCORE + "-" + (MYTHICAL_SCORE - 1) + ")***\n\u25c8 **Master (" + MASTER_SCORE + "-" + (GURU_SCORE - 1) + ")**\n\u25c8 **Advanced (" + ADVANCED_SCORE + "-" + (MASTER_SCORE - 1) + ")**\n\u25c8 Expert (" + EXPERT_SCORE + "-" + (ADVANCED_SCORE - 1) + ")\n\u25c8 Seasoned (" + SEASONED_SCORE + "-" + (EXPERT_SCORE - 1) + ")\n\u25c8 Accomplished (" + ACCOMPLISHED_SCORE + "-" + (SEASONED_SCORE - 1) + ")\n\u25c8 Experienced (" + EXPERIENCED_SCORE + "-" + (ACCOMPLISHED_SCORE - 1) + ")\n\u25c8 Apprentice (<" + EXPERIENCED_SCORE + ")\n");
+                final EmbedBuilder eb = new EmbedBuilder().setTitle("ANAGRAM SCORING").setDescription("**Scoring system can be seen while playing the game**\n\n" +
+                        "\u25c8 **How to gain points**\n" +
+                        "\u25c8 Scoring will be based on length of word and streak.\n" +
+                        "\u25c8 Correct words increase your streak, while incorrect words reset it (note used words doesn't affect your streak).\n\n" +
+                        "\u25c8 **Points System (Rest can be seen in game)**\n" +
+                        "\u25c8 Words of length <= 2 are not counted.\n" +
+                        "\u25c8 Words of length 3 are worth " + this.getRawScore(3) + " points\n" +
+                        "\u25c8 Words of length 4 are worth " + this.getRawScore(4) + " points\n" +
+                        "\u25c8 Words of length 5 are worth " + this.getRawScore(5) + " points\n" +
+                        "\u25c8 Words of length 6 are worth " + this.getRawScore(6) + " points\n" +
+                        "\u25c8 Words of length 7 are worth " + this.getRawScore(7) + " points\n" +
+                        "\u25c8 Words of length 8 are worth " + this.getRawScore(8) + " points\n\n" +
+                        "**Streak System**\n" +
+                        "\u25c8 Streak of 3 adds an extra 50 points per message\n" +
+                        "\u25c8 Streak of 5 adds an extra 150 points per message\n" +
+                        "\u25c8 Streak of 10 adds an extra streak x 50 points per message\n\n" +
+                        "**Ranks**\n" +
+                        "\u25c8 ***__GOD (" + GOD_SCORE + "+)__***\n" +
+                        "\u25c8 ***LEGENDARY (" + LEGENDARY_SCORE + "-" + (GOD_SCORE - 1) + ")***\n" +
+                        "\u25c8 ***Mythical (" + MYTHICAL_SCORE + "-" + (GOD_SCORE - 1) + ")***\n" +
+                        "\u25c8 ***Guru (" + GURU_SCORE + "-" + (MYTHICAL_SCORE - 1) + ")***\n" +
+                        "\u25c8 **Master (" + MASTER_SCORE + "-" + (GURU_SCORE - 1) + ")**\n" +
+                        "\u25c8 **Advanced (" + ADVANCED_SCORE + "-" + (MASTER_SCORE - 1) + ")**\n" +
+                        "\u25c8 Expert (" + EXPERT_SCORE + "-" + (ADVANCED_SCORE - 1) + ")\n" +
+                        "\u25c8 Seasoned (" + SEASONED_SCORE + "-" + (EXPERT_SCORE - 1) + ")\n" +
+                        "\u25c8 Accomplished (" + ACCOMPLISHED_SCORE + "-" + (SEASONED_SCORE - 1) + ")\n" +
+                        "\u25c8 Experienced (" + EXPERIENCED_SCORE + "-" + (ACCOMPLISHED_SCORE - 1) + ")\n" +
+                        "\u25c8 Apprentice (<" + EXPERIENCED_SCORE + ")\n");
                 eb.setFooter("Page 4").setColor(new Color(47, 204, 113));
+                event.getHook().sendMessageEmbeds(eb.build(), new MessageEmbed[0]).queue();
+            }
+            else if (page.getAsInt() == 5) {
+                final EmbedBuilder eb = new EmbedBuilder().setTitle("HOTPOTATO HELP").setDescription("**Scoring and Rank system is on the next page**\n\n" +
+                        "**How to Play**\n" +
+                        "A word will be given to you initially in the thread.\n" +
+                        "Try and form words that start with what the previous word ended in.\n" +
+                        "For example, `alphabot` -> `test`\n" +
+                        "You are intially given 5 seconds to come up with a word. Every 5 words, however, the time will decrease by 1 second to a minimum of 1 second.\n\n" +
+                        "**Slash Commands**\n" +
+                        "\u25c8 `abchotpotato` - creates an hotpotato game!\n\n" +
+                        "**Reactions**\n" +
+                        ":potato: - you found a valid word so the potato is passed on to the next person\n" +
+                        "\u274c - invalid word (already used or doesn't match the criteria)\n");
+                eb.setFooter("Page 5").setColor(new Color(0, 218, 255));
                 event.getHook().sendMessageEmbeds(eb.build(), new MessageEmbed[0]).queue();
             }
             else {
@@ -883,13 +961,10 @@ public class Main extends ListenerAdapter {
                         currentHotPotatoSetting.decrementCountTimer();
                         currentHotPotatoSetting.setActive(true);
                         currentHotPotatoSetting.resetCountTimer();
-
+                        threadChannel.sendMessage("There are " + currentHotPotatoSetting.getCountTimer() + " seconds left!").queue();
                         gameTimer.scheduleAtFixedRate(new TimerTask() {
                             public void run() {
                                 if (currentHotPotatoSetting.getCountTimer() > 0) {
-                                    if (currentHotPotatoSetting.getCountTimer() <= 3) {
-                                        threadChannel.sendMessage("There are " + currentHotPotatoSetting.getCountTimer() + " seconds left!").queue();
-                                    }
 
                                     threadChannel.editMessageEmbedsById(countdownMessageId, new MessageEmbed[]{currentHotPotatoSetting.ebBuild()}).queue();
                                     currentHotPotatoSetting.decrementCountTimer();
@@ -923,7 +998,7 @@ public class Main extends ListenerAdapter {
                                                     eb.setTitle("**Game is over!** :potato:");
                                                     eb.setColor(new Color(232, 234, 255));
 
-                                                    String ebDescription = "<@" + currentHotPotatoSetting.getCurrentParticipantId() + "> couldn't come up with a word in time!! You lose!!!\nWords Found:\n";
+                                                    String ebDescription = "<@" + currentHotPotatoSetting.getCurrentParticipantId() + "> couldn't come up with a word in time!! You lose!!!\nYou found " + currentHotPotatoSetting.getUsedWords().size() + " words:\n";
                                                     HashSet<String> words = currentHotPotatoSetting.getUsedWords();
 
                                                     for(String word : words) {
@@ -1221,7 +1296,7 @@ public class Main extends ListenerAdapter {
                         Commands.slash("slashtest", "a test command")
                                 .addOption(OptionType.INTEGER, "value", "converts value to string", true),
                         Commands.slash("abchelp", "Command to help you navigate Alphabot!")
-                                .addOption(OptionType.INTEGER, "page", "which page of settings (1-4)"),
+                                .addOption(OptionType.INTEGER, "page", "which page of settings (1-5)"),
                         Commands.slash("abcsettings", "Current Alphabot settings"),
                         Commands.slash("abcprefreq", "Whether or not prefix is required to count")
                                 .addOption(OptionType.STRING, "setting", "Prefix required (on/off)", true),
