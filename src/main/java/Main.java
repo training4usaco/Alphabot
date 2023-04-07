@@ -7,6 +7,7 @@ import net.dv8tion.jda.api.events.message.react.MessageReactionAddEvent;
 import net.dv8tion.jda.api.interactions.commands.OptionMapping;
 import net.dv8tion.jda.api.interactions.components.ActionRow;
 
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 import net.dv8tion.jda.api.interactions.components.ItemComponent;
@@ -175,10 +176,10 @@ public class Main extends ListenerAdapter {
                         return;
                     }
                 }
-                if (!currAnagramSetting.isActive()) {
-                    thread.sendMessage("Please wait for the game to start!").queue();
-                    return;
-                }
+//                if (!currAnagramSetting.isActive()) {
+//                    thread.sendMessage("Please wait for the game to start!").queue();
+//                    return;
+//                }
                 currAnagramSetting.incMessageCounter();
                 if (currAnagramSetting.getMessageCounter() == MESSAGE_RESET_LIMIT) {
                     final EmbedBuilder reminder = new EmbedBuilder();
@@ -244,13 +245,13 @@ public class Main extends ListenerAdapter {
 //                    return;
 //                }
 
-                if(currHotpotatoSetting.isGameOver()) {
+                if(currHotpotatoSetting.isGameOver() || !currHotpotatoSetting.isActive()) {
                     return;
                 }
-                if (!currHotpotatoSetting.isActive() && !currHotpotatoSetting.isGameOver()) {
-                    thread.sendMessage("Please wait for the game to start!").queue();
-                    return;
-                }
+//                if (!currHotpotatoSetting.isActive() && !currHotpotatoSetting.isGameOver()) {
+//                    thread.sendMessage("Please wait for the game to start!").queue();
+//                    return;
+//                }
 
                 if(event.getAuthor().getIdLong() == currHotpotatoSetting.getCurrentParticipantId()) {
                     if(!WordBank.contains(message)) {
@@ -259,12 +260,12 @@ public class Main extends ListenerAdapter {
                     }
 
                     if(currHotpotatoSetting.isUsedWord(message)) {
-                        event.getMessage().addReaction("U+274C").queue();
+                        event.getMessage().addReaction("U+1F7E1").queue();
                         return;
                     }
 
                     String prevWord = currHotpotatoSetting.getPrevWord();
-                    if(message.startsWith(prevWord.substring(prevWord.length() - 1))) {
+                    if(message.startsWith(prevWord.substring(prevWord.length() - 1)) && message.length() >= 3) {
                         event.getMessage().addReaction("U+1F954").queue();
                         currHotpotatoSetting.setPrevWord(message);
                         currHotpotatoSetting.incrementCurrentParticipantIndex();
@@ -274,8 +275,8 @@ public class Main extends ListenerAdapter {
                             currHotpotatoSetting.decrementMaxTime();
                             thread.sendMessage("Time decreased!").queue();
                         }
-                        thread.sendMessage("There are " + currHotpotatoSetting.getCountTimer() + " seconds left!").queue();
                         currHotpotatoSetting.resetCountTimer();
+                        thread.sendMessage("There are " + currHotpotatoSetting.getCountTimer() + " seconds left!").queue();
                         thread.sendMessage("<@" + currHotpotatoSetting.getCurrentParticipantId() + "> it is your turn!").queue();
                     }
                     else {
@@ -451,7 +452,10 @@ public class Main extends ListenerAdapter {
     public void onSlashCommandInteraction(final SlashCommandInteractionEvent event) {
         final GuildSetting currentGuildSetting = this.guildSettingHashMap.get(event.getGuild().getIdLong());
         event.deferReply().queue();
-        if (event.getName().equals("slashtest")) {
+        if(event.getName().equals("ping")) {
+            event.getHook().sendMessage("Ping: " + event.getJDA().getGatewayPing() + "ms").queue();
+        }
+        else if (event.getName().equals("slashtest")) {
             final Long value = event.getOption("value").getAsLong();
             event.getHook().sendMessage(getStringFromValue(value)).queue();
         }
@@ -563,18 +567,19 @@ public class Main extends ListenerAdapter {
                 event.getHook().sendMessageEmbeds(eb.build(), new MessageEmbed[0]).queue();
             }
             else if (page.getAsInt() == 5) {
-                final EmbedBuilder eb = new EmbedBuilder().setTitle("HOTPOTATO HELP").setDescription("**Scoring and Rank system is on the next page**\n\n" +
+                final EmbedBuilder eb = new EmbedBuilder().setTitle("HOTPOTATO HELP").setDescription(
                         "**How to Play**\n" +
                         "A word will be given to you initially in the thread.\n" +
                         "Try and form words that start with what the previous word ended in.\n" +
                         "For example, `alphabot` -> `test`\n" +
-                        "You are intially given 5 seconds to come up with a word. Every 5 words, however, the time will decrease by 1 second to a minimum of 1 second.\n\n" +
+                        "You are intially given 5 seconds to come up with a word. Every 5 words, however, the time will decrease by 1 second to a minimum of 2 seconds.\n\n" +
                         "**Slash Commands**\n" +
                         "\u25c8 `abchotpotato` - creates an hotpotato game!\n\n" +
                         "**Reactions**\n" +
                         ":potato: - you found a valid word so the potato is passed on to the next person\n" +
-                        "\u274c - invalid word (already used or doesn't match the criteria)\n");
-                eb.setFooter("Page 5").setColor(new Color(0, 218, 255));
+                        "\u274c - invalid word (doesn't match the criteria)\n" +
+                        "\uD83D\uDFE1 - word has already been used\n");
+                eb.setFooter("Page 5").setColor(new Color(88, 172, 236));
                 event.getHook().sendMessageEmbeds(eb.build(), new MessageEmbed[0]).queue();
             }
             else {
@@ -961,58 +966,63 @@ public class Main extends ListenerAdapter {
                         currentHotPotatoSetting.decrementCountTimer();
                         currentHotPotatoSetting.setActive(true);
                         currentHotPotatoSetting.resetCountTimer();
-                        threadChannel.sendMessage("There are " + currentHotPotatoSetting.getCountTimer() + " seconds left!").queue();
+                        threadChannel.sendMessage("<@" + currentHotPotatoSetting.getCurrentParticipantId() + "> it is your turn!").queue();
+
                         gameTimer.scheduleAtFixedRate(new TimerTask() {
                             public void run() {
                                 if (currentHotPotatoSetting.getCountTimer() > 0) {
-
                                     threadChannel.editMessageEmbedsById(countdownMessageId, new MessageEmbed[]{currentHotPotatoSetting.ebBuild()}).queue();
                                     currentHotPotatoSetting.decrementCountTimer();
                                 }
                                 else {
-                                    gameTimer.cancel();
-                                    currentHotPotatoSetting.setActive(false);
-                                    currentHotPotatoSetting.setGameOver(true);
+                                    threadChannel.sendMessage("<@" + currentHotPotatoSetting.getCurrentParticipantId() + "> has been eliminated! Number of participants left: " + (currentHotPotatoSetting.getParticipantOrder().size() - 1)).queue();
+                                    currentHotPotatoSetting.removeParticipant(currentHotPotatoSetting.getCurrentParticipantId());
+                                    currentHotPotatoSetting.resetCountTimer();
+                                    threadChannel.sendMessage("<@" + currentHotPotatoSetting.getCurrentParticipantId() + "> it is your turn!").queue();
+                                    if(currentHotPotatoSetting.getParticipantOrder().size() == 1) {
+                                        gameTimer.cancel();
+                                        currentHotPotatoSetting.setActive(false);
+                                        currentHotPotatoSetting.setGameOver(true);
 
-                                    Timer endingTimer = new Timer();
-                                    new EmbedBuilder();
-                                    EmbedBuilder closingEmbed = new EmbedBuilder();
-                                    closingEmbed.setTitle("**Game is over!**");
-                                    threadChannel.sendMessage(":boom:").queue();
-                                    threadChannel.sendMessageEmbeds(closingEmbed.setDescription("Thread closing in " + GAME_CLOSE_TIME + " seconds.\nA summary of this game will be reported in <#" + gameChannel.getIdLong() + "> after this thread is closed\n").build(), new MessageEmbed[0]).queue((closingEmbedMessage) -> {
-                                        final Long closingThreadMessageId = closingEmbedMessage.getIdLong();
-                                        endingTimer.scheduleAtFixedRate(new TimerTask() {
-                                            Integer closeClock = GAME_CLOSE_TIME - 1;
+                                        Timer endingTimer = new Timer();
+                                        new EmbedBuilder();
+                                        EmbedBuilder closingEmbed = new EmbedBuilder();
+                                        closingEmbed.setTitle("**Game is over!**");
+                                        threadChannel.sendMessage(":boom:").queue();
+                                        threadChannel.sendMessageEmbeds(closingEmbed.setDescription("Thread closing in " + GAME_CLOSE_TIME + " seconds.\nA summary of this game will be reported in <#" + gameChannel.getIdLong() + "> after this thread is closed\n").build(), new MessageEmbed[0]).queue((closingEmbedMessage) -> {
+                                            final Long closingThreadMessageId = closingEmbedMessage.getIdLong();
+                                            endingTimer.scheduleAtFixedRate(new TimerTask() {
+                                                Integer closeClock = GAME_CLOSE_TIME - 1;
 
-                                            public void run() {
-                                                if (this.closeClock > 0) {
-                                                    closingEmbed.setTitle("**Game is over!**");
-                                                    closingEmbed.setDescription("Thread closing in " + this.closeClock + " seconds.\nA summary of this game will be reported in <#" + gameChannel.getIdLong() + "> after this thread is closed\n");
-                                                    threadChannel.editMessageEmbedsById(closingThreadMessageId, new MessageEmbed[]{closingEmbed.build()}).queue();
-                                                    this.closeClock = this.closeClock - 1;
-                                                }
-                                                else {
-                                                    endingTimer.cancel();
+                                                public void run() {
+                                                    if (this.closeClock > 0) {
+                                                        closingEmbed.setTitle("**Game is over!**");
+                                                        closingEmbed.setDescription("Thread closing in " + this.closeClock + " seconds.\nA summary of this game will be reported in <#" + gameChannel.getIdLong() + "> after this thread is closed\n");
+                                                        threadChannel.editMessageEmbedsById(closingThreadMessageId, new MessageEmbed[]{closingEmbed.build()}).queue();
+                                                        this.closeClock = this.closeClock - 1;
+                                                    } else {
+                                                        endingTimer.cancel();
 
-                                                    EmbedBuilder eb = new EmbedBuilder();
-                                                    eb.setTitle("**Game is over!** :potato:");
-                                                    eb.setColor(new Color(232, 234, 255));
+                                                        EmbedBuilder eb = new EmbedBuilder();
+                                                        eb.setTitle("**Game is over!** :potato:");
+                                                        eb.setColor(new Color(232, 234, 255));
 
-                                                    String ebDescription = "<@" + currentHotPotatoSetting.getCurrentParticipantId() + "> couldn't come up with a word in time!! You lose!!!\nYou found " + currentHotPotatoSetting.getUsedWords().size() + " words:\n";
-                                                    HashSet<String> words = currentHotPotatoSetting.getUsedWords();
+                                                        String ebDescription = "<@" + currentHotPotatoSetting.getCurrentParticipantId() + "> is the last one standing!! ***You Win!!!***\nYou guys found " + currentHotPotatoSetting.getUsedWords().size() + " words:\n";
+                                                        HashSet<String> words = currentHotPotatoSetting.getUsedWords();
 
-                                                    for(String word : words) {
-                                                        ebDescription = ebDescription + word + "\n";
+                                                        for (String word : words) {
+                                                            ebDescription = ebDescription + word + "\n";
+                                                        }
+                                                        eb.setDescription(ebDescription);
+                                                        gameChannel.sendMessageEmbeds(eb.build()).queue();
+                                                        hotpotatoHashMap.remove("<@" + participantUserId + "> hotpotato");
+                                                        threadChannel.delete().queue();
                                                     }
-                                                    eb.setDescription(ebDescription);
-                                                    gameChannel.sendMessageEmbeds(eb.build()).queue();
-                                                    hotpotatoHashMap.remove("<@" + participantUserId + "> hotpotato");
-                                                    threadChannel.delete().queue();
-                                                }
 
-                                            }
-                                        }, 1000L, 1000L);
-                                    });
+                                                }
+                                            }, 1000L, 1000L);
+                                        });
+                                    }
                                 }
                             }
                         }, 1000L, 1000L);
@@ -1170,7 +1180,8 @@ public class Main extends ListenerAdapter {
             final String buttonName = event.getComponentId().split(" ")[0];
             final String gameHost = event.getComponentId().split(" ")[1];
             if (event.getMember().getIdLong() != Long.valueOf(gameHost)) {
-                event.getHook().sendMessage("You are not the host of this coop game!").setEphemeral(true).queue();
+                event.getHook().setEphemeral(true);
+                event.getHook().sendMessage("You are not the host of this coop game!").queue();
                 return;
             }
             this.anagramCoopHost.remove(event.getMember().getIdLong());
@@ -1203,7 +1214,8 @@ public class Main extends ListenerAdapter {
             final String madeRequestUser = event.getComponentId().split(" ")[1];
             final String requestedUser = event.getComponentId().split(" ")[2];
             if (!requestedUser.equals(String.valueOf(event.getUser().getIdLong()))) {
-                event.getHook().sendMessage("This is not your game request!").setEphemeral(true).queue();
+                event.getHook().setEphemeral(true);
+                event.getHook().sendMessage("This is not your game request!").queue();
                 return;
             }
             event.getMessage().getActionRows().forEach(row -> row.getButtons().forEach(button -> button = button.asDisabled()));
@@ -1255,7 +1267,8 @@ public class Main extends ListenerAdapter {
             final String gameHost = event.getComponentId().split(" ")[1];
 
             if (event.getMember().getIdLong() != Long.valueOf(gameHost)) {
-                event.getHook().sendMessage("You are not the host of this hotpotato game!").setEphemeral(true).queue();
+                event.getHook().setEphemeral(true);
+                event.getHook().sendMessage("You are not the host of this hotpotato game!").queue();
                 return;
             }
 
@@ -1263,6 +1276,10 @@ public class Main extends ListenerAdapter {
             event.getMessage().getActionRows().forEach(row -> row.getButtons().forEach(button -> button = button.asDisabled()));
 
             if (buttonName.startsWith("hotpotatoStartButton")) {
+                if(messageHotPotatoHashMap.get(event.getMessageIdLong()).getParticipants().size() == 0) {
+                    event.getHook().sendMessage("Sorry! You need must have at least 2 participants to start a hotpotato game!").queue();
+                    return;
+                }
                 EmbedBuilder eb = new EmbedBuilder();
                 event.getMessage().editMessageEmbeds(eb.setTitle("**Hot potato game started!**").build()).setActionRows(new ActionRow[0]).queue();
                 final String threadTitle = "<@" + gameHost + "> hotpotato; ";
@@ -1275,7 +1292,7 @@ public class Main extends ListenerAdapter {
             }
             else if (buttonName.startsWith("hotpotatoCancelButton")) {
                 final EmbedBuilder eb = new EmbedBuilder();
-                event.getMessage().editMessageEmbeds(eb.setTitle("**Coop game cancelled.**").build()).setActionRows(new ActionRow[0]).queue();
+                event.getMessage().editMessageEmbeds(eb.setTitle("**Hotpotato game cancelled.**").build()).setActionRows(new ActionRow[0]).queue();
                 event.getHook().sendMessage("Cancelled!").queue();
                 messageHotPotatoHashMap.remove(event.getMessageIdLong());
             }
@@ -1293,8 +1310,9 @@ public class Main extends ListenerAdapter {
             this.guildSettingHashMap.put(doc.getLong("_id"), GuildSetting.fromDocument(doc));
             try {
                 Main.jda.getGuildById(doc.getLong("_id")).updateCommands().addCommands(
-                        Commands.slash("slashtest", "a test command")
-                                .addOption(OptionType.INTEGER, "value", "converts value to string", true),
+                        Commands.slash("ping", "test latency of bot"),
+//                        Commands.slash("slashtest", "a test command")
+//                                .addOption(OptionType.INTEGER, "value", "converts value to string", true),
                         Commands.slash("abchelp", "Command to help you navigate Alphabot!")
                                 .addOption(OptionType.INTEGER, "page", "which page of settings (1-5)"),
                         Commands.slash("abcsettings", "Current Alphabot settings"),

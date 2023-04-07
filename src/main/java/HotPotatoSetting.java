@@ -34,9 +34,9 @@ public class HotPotatoSetting {
         this.active = false;
         this.gameOver = false;
 
-        this.countTimer = 5;
+        this.countTimer = 7;
         messageCount = 0;
-        maxTime = 5;
+        maxTime = 7;
         this.currentParticipantIndex = 0;
     }
 
@@ -52,7 +52,7 @@ public class HotPotatoSetting {
     }
 
     public boolean isGameOver() { return this.gameOver; }
-    public Long getCurrentParticipantId() { return participantOrder.get(this.currentParticipantIndex); }
+    public Long getCurrentParticipantId() { return participantOrder.get(this.currentParticipantIndex % participantOrder.size()); }
     public long getHostId() {
         return hostId;
     }
@@ -101,8 +101,11 @@ public class HotPotatoSetting {
             participantOrder.add(participant);
         }
     }
+    public void removeParticipant(long participant) {
+        participantOrder.remove(participant);
+    }
     public void resetCountTimer() { countTimer = maxTime; }
-    public void decrementMaxTime() { maxTime = Math.max(1, maxTime - 1); }
+    public void decrementMaxTime() { maxTime = Math.max(2, maxTime - 1); }
     public void incrementMessageCount() { ++messageCount; }
     public void incrementCurrentParticipantIndex() { ++currentParticipantIndex; currentParticipantIndex %= participantOrder.size(); }
 }
