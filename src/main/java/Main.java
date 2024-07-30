@@ -1,5 +1,8 @@
 import com.mongodb.client.MongoCursor;
 import net.dv8tion.jda.api.entities.*;
+import net.dv8tion.jda.api.events.interaction.command.GenericContextInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.command.MessageContextInteractionEvent;
+import net.dv8tion.jda.api.events.interaction.command.UserContextInteractionEvent;
 import net.dv8tion.jda.api.interactions.commands.OptionType;
 import net.dv8tion.jda.api.interactions.commands.build.Commands;
 import net.dv8tion.jda.api.events.interaction.component.ButtonInteractionEvent;
@@ -94,7 +97,7 @@ public class Main extends ListenerAdapter {
     private static final String[] CONSONANTS;
 
     public static void main(final String[] args) throws IOException {
-        final Scanner config = new Scanner(new File("Config.txt"));
+        final Scanner config = new Scanner(new File("package/Config.txt"));
         try {
             Main.jda = JDABuilder.createDefault(config.nextLine()).build();
             System.out.println("Logged in as " + Main.jda.getSelfUser().getName() + "#" + Main.jda.getSelfUser().getDiscriminator());
@@ -102,7 +105,7 @@ public class Main extends ListenerAdapter {
             System.out.println("Login failed");
             e.printStackTrace();
         }
-        final Scanner wordScanner = new Scanner(new File("words_alpha.txt"));
+        final Scanner wordScanner = new Scanner(new File("package/words_alpha.txt"));
         while (wordScanner.hasNextLine()) {
             final String word = wordScanner.nextLine();
             Main.WordBank.add(word);
@@ -439,7 +442,7 @@ public class Main extends ListenerAdapter {
     public void onGuildJoin(final GuildJoinEvent event) {
         final EmbedBuilder eb = new EmbedBuilder();
         eb.setTitle("Welcome to Alphabot!");
-        eb.appendDescription("Hello! Someone invited me to your server! \nThis bot will help you learn your abcs in no time!\n\nidk random stuff still wip leave me alone :C. \n");
+        eb.appendDescription("Hello! Someone invited me to your server! \nThis bot will help you learn your abcs in no time!");
         event.getGuild().getSystemChannel().sendMessageEmbeds(eb.build(), new MessageEmbed[0]).queue();
         final GuildSetting gSetting = new GuildSetting();
         this.guildSettingHashMap.put(event.getGuild().getIdLong(), gSetting);
@@ -569,16 +572,16 @@ public class Main extends ListenerAdapter {
             else if (page.getAsInt() == 5) {
                 final EmbedBuilder eb = new EmbedBuilder().setTitle("HOTPOTATO HELP").setDescription(
                         "**How to Play**\n" +
-                        "A word will be given to you initially in the thread.\n" +
-                        "Try and form words that start with what the previous word ended in.\n" +
-                        "For example, `alphabot` -> `test`\n" +
-                        "You are intially given 5 seconds to come up with a word. Every 5 words, however, the time will decrease by 1 second to a minimum of 2 seconds.\n\n" +
-                        "**Slash Commands**\n" +
-                        "\u25c8 `abchotpotato` - creates an hotpotato game!\n\n" +
-                        "**Reactions**\n" +
-                        ":potato: - you found a valid word so the potato is passed on to the next person\n" +
-                        "\u274c - invalid word (doesn't match the criteria)\n" +
-                        "\uD83D\uDFE1 - word has already been used\n");
+                                "A word will be given to you initially in the thread.\n" +
+                                "Try and form words that start with what the previous word ended in.\n" +
+                                "For example, `alphabot` -> `test`\n" +
+                                "You are intially given 5 seconds to come up with a word. Every 5 words, however, the time will decrease by 1 second to a minimum of 2 seconds.\n\n" +
+                                "**Slash Commands**\n" +
+                                "\u25c8 `abchotpotato` - creates an hotpotato game!\n\n" +
+                                "**Reactions**\n" +
+                                ":potato: - you found a valid word so the potato is passed on to the next person\n" +
+                                "\u274c - invalid word (doesn't match the criteria)\n" +
+                                "\uD83D\uDFE1 - word has already been used\n");
                 eb.setFooter("Page 5").setColor(new Color(88, 172, 236));
                 event.getHook().sendMessageEmbeds(eb.build(), new MessageEmbed[0]).queue();
             }
@@ -872,6 +875,16 @@ public class Main extends ListenerAdapter {
                     }
                 }, 1000 * 60 * 5L);
             });
+        }
+    }
+
+    @Override
+    public void onUserContextInteraction(final UserContextInteractionEvent event) {
+        event.deferReply().queue();
+        if(event.getName().equals("hi")) {
+            final EmbedBuilder eb = new EmbedBuilder().setTitle("Hello!");
+            eb.setDescription("The best bot for learning your abc's!\n\n\n Try using /abchelp!");
+            event.getHook().sendMessageEmbeds(eb.setColor(new Color(255, 255, 255)).build(), new MessageEmbed[0]).queue();
         }
     }
 
@@ -1323,7 +1336,8 @@ public class Main extends ListenerAdapter {
                                 .addOption(OptionType.STRING, "coop", "Cooperative game of anagram with someone (auto start yes/no)", false),
                         Commands.slash("abcpisetchannel", "Set channel for Pi counting!")
                                 .addOption(OptionType.STRING, "channel", "Channel to count in", true),
-                        Commands.slash("abchotpotato", "Hot potato word game!")
+                        Commands.slash("abchotpotato", "Hot potato word game!"),
+                        Commands.user("hi")
                 ).queue();
             } catch (Exception ex) {
             }
